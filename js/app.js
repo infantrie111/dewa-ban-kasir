@@ -1,53 +1,5 @@
 // ========================================
-// AUTHENTICATION SYSTEM
-// ========================================
-
-const _u = 'am9zamlzdG9wdGlw';
-const _p = 'Ym9zYWd1bmcxMjM0';
-
-// Fungsi cek autentikasi
-function checkAuth() {
-    // Cek apakah sudah login di session ini
-    if (sessionStorage.getItem('isLoggedIn') === 'true') {
-        return true;
-    }
-
-    // Minta kredensial
-    const inputUser = prompt('Masukkan Username:');
-    if (!inputUser) {
-        alert('Akses Ditolak!');
-        location.reload();
-        return false;
-    }
-
-    const inputPass = prompt('Masukkan Password:');
-    if (!inputPass) {
-        alert('Akses Ditolak!');
-        location.reload();
-        return false;
-    }
-
-    // Validasi dengan Base64
-    const encodedUser = btoa(inputUser);
-    const encodedPass = btoa(inputPass);
-
-    if (encodedUser === _u && encodedPass === _p) {
-        sessionStorage.setItem('isLoggedIn', 'true');
-        return true;
-    } else {
-        alert('Akses Ditolak!');
-        location.reload();
-        return false;
-    }
-}
-
-// Jalankan autentikasi SEGERA
-if (!checkAuth()) {
-    throw new Error('Unauthorized');
-}
-
-// ========================================
-// FIREBASE CONFIGURATION
+// FIREBASE CONFIGURATION & AUTHENTICATION
 // ========================================
 const firebaseConfig = {
     apiKey: "AIzaSyCjRuA_yG39jArA1A00TkG2J29FJkq2e-A",
@@ -62,6 +14,15 @@ const firebaseConfig = {
 // Inisialisasi Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const auth = firebase.auth();
+
+// Set persistence to LOCAL (remember me)
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(err => console.error('Auth persistence error:', err));
+
+// Global auth state
+let currentUser = null;
+let isAuthenticated = false;
 
 // Flag untuk cek apakah menggunakan Firebase atau LocalStorage (fallback)
 let useFirebase = true;
@@ -328,8 +289,14 @@ function updateProductStockFirebase(productId, newStock) {
     }
 }
 
-// Inisialisasi Firebase Products dengan Realtime Listener
+// Inisialisasi Firebase Products dengan Realtime Listener (hanya jika authenticated)
 function initFirebaseProducts() {
+    // Guard: hanya jalankan jika user sudah login
+    if (!isAuthenticated || !currentUser) {
+        console.log('⚠️ Firebase products skipped: User not authenticated');
+        return;
+    }
+
     db.ref('products').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && typeof data === 'object') {
@@ -360,15 +327,8 @@ function initFirebaseProducts() {
     });
 }
 
-// Inisialisasi Firebase saat app load
-try {
-    initFirebaseProducts();
-    initFirebaseTransactions();
-} catch (err) {
-    console.error('Firebase init error:', err);
-    useFirebase = false;
-    firebaseReady = true;
-}
+// Firebase Init akan dipanggil dari onAuthStateChanged setelah login
+// TIDAK dijalankan di sini lagi
 
 let products = loadProducts();
 
@@ -517,8 +477,14 @@ function getTransactionHistory() {
     return JSON.parse(localStorage.getItem(TRANSACTION_HISTORY_KEY) || '[]');
 }
 
-// Inisialisasi Firebase Transactions dengan Realtime Listener
+// Inisialisasi Firebase Transactions dengan Realtime Listener (hanya jika authenticated)
 function initFirebaseTransactions() {
+    // Guard: hanya jalankan jika user sudah login
+    if (!isAuthenticated || !currentUser) {
+        console.log('⚠️ Firebase transactions skipped: User not authenticated');
+        return;
+    }
+
     db.ref('transactions').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && typeof data === 'object') {
@@ -781,6 +747,119 @@ function downloadDailyReport() {
     downloadCSV(csv, filename);
 }
 
+// ========================================
+// AUTHENTICATION FUNCTIONS
+// ========================================
+
+// Login function dengan auto-append @dewaban.com
+function loginWithEmail(username, password) {
+    const email = username.includes('@') ? username : `${username}@dewaban.com`;
+
+    return auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            console.log('✅ Login berhasil:', userCredential.user.email);
+            return userCredential.user;
+        })
+        .catch((error) => {
+            console.error('❌ Login error:', error);
+            throw error;
+        });
+}
+
+// Logout function
+function logout() {
+    return auth.signOut()
+        .then(() => {
+            console.log('✅ Logout berhasil');
+        })
+        .catch((error) => {
+            console.error('❌ Logout error:', error);
+            throw error;
+        });
+}
+
+// Extract username dari email
+function getUsernameFromEmail(email) {
+    if (!email) return '';
+    return email.replace('@dewaban.com', '');
+}
+
+// Update profile button display
+function updateProfileButton(user) {
+    const profileStatus = document.getElementById('profile-status');
+    const profileUsername = document.getElementById('profile-username');
+
+    if (user && profileUsername) {
+        const username = getUsernameFromEmail(user.email);
+        profileUsername.textContent = username;
+        // Add click handler to profile status for logout
+        if (profileStatus) {
+            profileStatus.style.cursor = 'pointer';
+            profileStatus.title = 'Klik untuk logout';
+        }
+    } else if (profileUsername) {
+        profileUsername.textContent = '-';
+        if (profileStatus) {
+            profileStatus.style.cursor = 'default';
+            profileStatus.title = '';
+        }
+    }
+}
+
+// Auth State Listener - This is the core of the auth system
+auth.onAuthStateChanged((user) => {
+    currentUser = user;
+    isAuthenticated = !!user;
+
+    if (user) {
+        console.log('✅ User logged in:', user.email);
+
+        // Update UI
+        updateProfileButton(user);
+
+        // Hide login modal
+        const loginModalEl = document.getElementById('loginModal');
+        if (loginModalEl) {
+            const loginModal = bootstrap.Modal.getInstance(loginModalEl);
+            if (loginModal) {
+                loginModal.hide();
+            }
+        }
+
+        // Initialize Firebase data listeners (sekarang aman karena authenticated)
+        try {
+            initFirebaseProducts();
+            initFirebaseTransactions();
+        } catch (err) {
+            console.error('Firebase init error:', err);
+            useFirebase = false;
+            firebaseReady = true;
+        }
+
+        // Clear old session storage
+        sessionStorage.removeItem('isLoggedIn');
+
+    } else {
+        console.log('⚠️ User not logged in');
+
+        // Update UI
+        updateProfileButton(null);
+
+        // Show login modal
+        const loginModalEl = document.getElementById('loginModal');
+        if (loginModalEl) {
+            const loginModal = new bootstrap.Modal(loginModalEl);
+            loginModal.show();
+        }
+
+        // Clear auth state
+        isAuthenticated = false;
+        currentUser = null;
+        useFirebase = false;
+        firebaseReady = true;
+    }
+});
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     applySettingsToUI();
@@ -798,6 +877,90 @@ document.addEventListener('DOMContentLoaded', () => {
     discountEl.addEventListener('input', updateTotals);
     taxEl.addEventListener('input', updateTotals);
     amountPaidEl.addEventListener('input', calculateChange);
+
+    // Authentication event listeners
+    const loginBtn = document.getElementById('login-btn');
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+    const loginErrorMessage = document.getElementById('login-error-message');
+
+    // Login button click
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const username = loginUsernameInput?.value?.trim();
+            const password = loginPasswordInput?.value?.trim();
+
+            if (!username || !password) {
+                if (loginErrorMessage) {
+                    loginErrorMessage.textContent = 'Username dan password harus diisi';
+                    loginErrorMessage.classList.remove('d-none');
+                }
+                return;
+            }
+
+            // Disable button saat login
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Login...';
+
+            try {
+                await loginWithEmail(username, password);
+                // Success handled by onAuthStateChanged
+                if (loginErrorMessage) {
+                    loginErrorMessage.classList.add('d-none');
+                }
+                if (loginUsernameInput) loginUsernameInput.value = '';
+                if (loginPasswordInput) loginPasswordInput.value = '';
+            } catch (error) {
+                console.error('Login error:', error);
+                if (loginErrorMessage) {
+                    let message = 'Login gagal. Periksa username dan password.';
+                    if (error.code === 'auth/user-not-found') {
+                        message = 'Username tidak ditemukan';
+                    } else if (error.code === 'auth/wrong-password') {
+                        message = 'Password salah';
+                    } else if (error.code === 'auth/invalid-email') {
+                        message = 'Format email tidak valid';
+                    } else if (error.code === 'auth/too-many-requests') {
+                        message = 'Terlalu banyak percobaan. Tunggu sebentar.';
+                    }
+                    loginErrorMessage.textContent = message;
+                    loginErrorMessage.classList.remove('d-none');
+                }
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Login';
+            }
+        });
+    }
+
+    // Enter key support untuk login
+    if (loginPasswordInput) {
+        loginPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loginBtn?.click();
+            }
+        });
+    }
+
+    // Profile status - show user info or login modal
+    const profileStatus = document.getElementById('profile-status');
+    if (profileStatus) {
+        profileStatus.addEventListener('click', () => {
+            if (isAuthenticated && currentUser) {
+                // Show logout confirmation
+                if (confirm(`Logout dari akun ${getUsernameFromEmail(currentUser.email)}?`)) {
+                    logout();
+                }
+            } else {
+                // Show login modal
+                const loginModalEl = document.getElementById('loginModal');
+                if (loginModalEl) {
+                    const loginModal = new bootstrap.Modal(loginModalEl);
+                    loginModal.show();
+                }
+            }
+        });
+    }
 
     if (saveSettingsBtn) {
         saveSettingsBtn.addEventListener('click', () => {
