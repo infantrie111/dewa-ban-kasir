@@ -1,4 +1,52 @@
 // ========================================
+// AUTHENTICATION SYSTEM
+// ========================================
+
+const _u = 'am9zamlzdG9wdGlw';
+const _p = 'Ym9zYWd1bmcxMjM0';
+
+// Fungsi cek autentikasi
+function checkAuth() {
+    // Cek apakah sudah login di session ini
+    if (sessionStorage.getItem('isLoggedIn') === 'true') {
+        return true;
+    }
+
+    // Minta kredensial
+    const inputUser = prompt('Masukkan Username:');
+    if (!inputUser) {
+        alert('Akses Ditolak!');
+        location.reload();
+        return false;
+    }
+
+    const inputPass = prompt('Masukkan Password:');
+    if (!inputPass) {
+        alert('Akses Ditolak!');
+        location.reload();
+        return false;
+    }
+
+    // Validasi dengan Base64
+    const encodedUser = btoa(inputUser);
+    const encodedPass = btoa(inputPass);
+
+    if (encodedUser === _u && encodedPass === _p) {
+        sessionStorage.setItem('isLoggedIn', 'true');
+        return true;
+    } else {
+        alert('Akses Ditolak!');
+        location.reload();
+        return false;
+    }
+}
+
+// Jalankan autentikasi SEGERA
+if (!checkAuth()) {
+    throw new Error('Unauthorized');
+}
+
+// ========================================
 // FIREBASE CONFIGURATION
 // ========================================
 const firebaseConfig = {
@@ -311,32 +359,6 @@ function initFirebaseProducts() {
         firebaseReady = true;
     });
 }
-
-// ========================================
-// SEED DATABASE FUNCTION
-// ========================================
-// Jalankan di console: seedDatabase()
-window.seedDatabase = function () {
-    if (!confirm('Upload semua DEFAULT_PRODUCTS ke Firebase? Ini akan menimpa data yang ada.')) {
-        return;
-    }
-
-    const productsObj = {};
-    DEFAULT_PRODUCTS.forEach(p => {
-        const normalized = normalizeProduct(p);
-        productsObj[normalized.id] = normalized;
-    });
-
-    db.ref('products').set(productsObj)
-        .then(() => {
-            console.log('✅ Database seeded successfully dengan', DEFAULT_PRODUCTS.length, 'products');
-            alert('Database berhasil di-seed dengan ' + DEFAULT_PRODUCTS.length + ' produk!');
-        })
-        .catch(err => {
-            console.error('❌ Seed database error:', err);
-            alert('Gagal seed database: ' + err.message);
-        });
-};
 
 // Inisialisasi Firebase saat app load
 try {
