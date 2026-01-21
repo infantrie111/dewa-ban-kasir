@@ -585,26 +585,21 @@ function renderTransactionHistory() {
         let totalQty = 0;
 
         if (items.length > 0) {
-            // Tampilkan nama produk pertama + qty
+            // Tampilkan semua nama produk + qty (tanpa batasan panjang)
             productNames = items.map(it => {
                 const name = it.name || it.itemName || 'Produk';
                 const qty = Number(it.quantity) || 1;
                 totalQty += qty;
                 return `${name} x${qty}`;
             }).join(', ');
-
-            // Batasi panjang string jika terlalu panjang
-            if (productNames.length > 50) {
-                productNames = productNames.substring(0, 47) + '...';
-            }
         } else {
             productNames = 'Tidak ada item';
         }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>
-                <div class="fw-semibold">${productNames}</div>
+            <td style="vertical-align: top;">
+                <div class="fw-semibold" style="word-wrap: break-word; white-space: normal; line-height: 1.4; max-width: 350px;">${productNames}</div>
                 <small class="text-muted">${parts.dateTime}</small>
             </td>
             <td style="text-align: center; vertical-align: middle;">

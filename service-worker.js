@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v11';
+const CACHE_NAME = 'dewa-ban-v12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
