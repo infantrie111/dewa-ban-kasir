@@ -488,8 +488,11 @@ function initFirebaseTransactions() {
     db.ref('transactions').on('value', (snapshot) => {
         const data = snapshot.val();
         if (data && typeof data === 'object') {
-            // Convert object ke array
-            firebaseTransactions = Object.values(data);
+            // Convert object ke array, tapi simpan Firebase key sebagai firebaseId
+            firebaseTransactions = Object.keys(data).map(key => ({
+                ...data[key],
+                firebaseId: key  // Simpan Firebase key untuk keperluan delete
+            }));
 
             // Juga simpan ke LocalStorage sebagai backup
             localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(firebaseTransactions));
@@ -639,16 +642,34 @@ function deleteTransaction(transactionNo) {
     if (!confirm(`Hapus transaksi ${txNo}?`)) return;
 
     const history = getTransactionHistory();
-    const next = history.filter(t => String(t?.transactionNo || '') !== txNo);
-    if (next.length === history.length) {
+    const trx = history.find(t => String(t?.transactionNo || '') === txNo);
+
+    if (!trx) {
         showAlert('Transaksi tidak ditemukan', 'warning');
         return;
     }
 
-    localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(next));
-    renderTransactionHistory();
-    renderAdminDailyStats();
-    showAlert('Transaksi dihapus', 'success');
+    // Jika menggunakan Firebase dan transaksi memiliki firebaseId
+    if (useFirebase && firebaseReady && trx.firebaseId) {
+        // Hapus dari Firebase
+        db.ref('transactions/' + trx.firebaseId).remove()
+            .then(() => {
+                console.log('✅ Transaksi berhasil dihapus dari Firebase');
+                showAlert('Transaksi dihapus', 'success');
+                // UI akan auto-refresh via onAuthStateChanged listener
+            })
+            .catch(err => {
+                console.error('❌ Gagal menghapus transaksi dari Firebase:', err);
+                showAlert('Gagal menghapus transaksi', 'danger');
+            });
+    } else {
+        // Fallback: hapus dari localStorage saja
+        const next = history.filter(t => String(t?.transactionNo || '') !== txNo);
+        localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(next));
+        renderTransactionHistory();
+        renderAdminDailyStats();
+        showAlert('Transaksi dihapus (local)', 'success');
+    }
 }
 
 function saveTransactionToHistory(transactionData) {
