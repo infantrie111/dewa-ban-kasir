@@ -363,6 +363,7 @@ function initFirebaseProducts() {
 // Inisialisasi Firebase saat app load
 try {
     initFirebaseProducts();
+    initFirebaseTransactions();
 } catch (err) {
     console.error('Firebase init error:', err);
     useFirebase = false;
@@ -505,8 +506,42 @@ function escapeCSV(value) {
     return s;
 }
 
+// Variabel global untuk menyimpan transaksi dari Firebase
+let firebaseTransactions = [];
+
 function getTransactionHistory() {
+    // Prioritas: Firebase jika ada, fallback ke LocalStorage
+    if (useFirebase && firebaseTransactions.length > 0) {
+        return firebaseTransactions;
+    }
     return JSON.parse(localStorage.getItem(TRANSACTION_HISTORY_KEY) || '[]');
+}
+
+// Inisialisasi Firebase Transactions dengan Realtime Listener
+function initFirebaseTransactions() {
+    db.ref('transactions').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && typeof data === 'object') {
+            // Convert object ke array
+            firebaseTransactions = Object.values(data);
+
+            // Juga simpan ke LocalStorage sebagai backup
+            localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(firebaseTransactions));
+
+            // Refresh UI jika DOM sudah ready
+            if (typeof renderTransactionHistory === 'function') {
+                renderTransactionHistory();
+            }
+            if (typeof renderAdminDailyStats === 'function') {
+                renderAdminDailyStats();
+            }
+            console.log('✅ Firebase transactions synced:', firebaseTransactions.length, 'items');
+        } else {
+            console.log('⚠️ Firebase transactions kosong');
+        }
+    }, (error) => {
+        console.error('❌ Firebase transactions listener error:', error);
+    });
 }
 
 function calculateDailyStats() {
@@ -565,8 +600,8 @@ function renderTransactionHistory() {
     const history = getTransactionHistory();
     const sorted = [...history].sort((a, b) => {
         const da = new Date(a?.date || 0).getTime();
-        const db = new Date(b?.date || 0).getTime();
-        return db - da;
+        const dbTime = new Date(b?.date || 0).getTime();
+        return dbTime - da; // Terbaru di atas
     });
 
     adminHistoryTbody.innerHTML = '';
@@ -574,15 +609,42 @@ function renderTransactionHistory() {
         const txNo = String(t?.transactionNo || '');
         const d = new Date(t?.date || Date.now());
         const parts = formatDateTimeParts(d);
+
+        // Ambil nama produk dari items
+        const items = t?.items || [];
+        let productNames = '';
+        let totalQty = 0;
+
+        if (items.length > 0) {
+            // Tampilkan nama produk pertama + qty
+            productNames = items.map(it => {
+                const name = it.name || it.itemName || 'Produk';
+                const qty = Number(it.quantity) || 1;
+                totalQty += qty;
+                return `${name} x${qty}`;
+            }).join(', ');
+
+            // Batasi panjang string jika terlalu panjang
+            if (productNames.length > 50) {
+                productNames = productNames.substring(0, 47) + '...';
+            }
+        } else {
+            productNames = 'Tidak ada item';
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td class="fw-semibold">${txNo}</td>
-            <td>${parts.dateTime}</td>
-            <td>Rp ${formatNumber(Number(t?.total) || 0)}</td>
             <td>
-                <button type="button" class="btn btn-sm btn-outline-primary" data-action="reprint" data-tx="${txNo}">Cetak Ulang</button>
+                <div class="fw-semibold">${productNames}</div>
+                <small class="text-muted">${parts.dateTime}</small>
             </td>
-            <td>
+            <td style="text-align: center; vertical-align: middle;">
+                <div class="fw-bold">Rp ${formatNumber(Number(t?.total) || 0)}</div>
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-action="reprint" data-tx="${txNo}">Cetak</button>
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
                 <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-tx="${txNo}" aria-label="Hapus">
                     <i class="bi bi-trash"></i>
                 </button>
