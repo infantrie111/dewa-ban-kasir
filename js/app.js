@@ -1566,60 +1566,63 @@ function showReceipt(transaction) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    const fit = (s, len) => {
-        const str = String(s);
-        if (str.length <= len) return str;
-        return str.slice(0, Math.max(0, len - 1)) + '…';
-    };
-
+    // lineLR untuk baris summary (left-right alignment)
     const lineLR = (left, right, width = 32) => {
+        const l = String(left);
         const r = String(right);
-        const maxLeft = Math.max(0, width - r.length - 1);
-        const l = fit(String(left), maxLeft);
-        return (l + ' '.repeat(Math.max(1, width - l.length - r.length)) + r);
+        const spaces = Math.max(1, width - l.length - r.length);
+        return (l + ' '.repeat(spaces) + r);
     };
 
-    const bodyLines = [];
-    bodyLines.push('--------------------------------');
-    bodyLines.push(`No: ${txNo}`);
-    bodyLines.push(`Tgl: ${parts.dateTime}`);
-    if (transaction.cashier) bodyLines.push(`Kasir: ${transaction.cashier}`);
-    if (transaction.staff) bodyLines.push(`Mekanik: ${transaction.staff}`);
-    bodyLines.push('--------------------------------');
+    // Info Transaksi (Header section after store info)
+    const infoLines = [];
+    infoLines.push('--------------------------------');
+    infoLines.push(`No: ${txNo}`);
+    infoLines.push(`Tgl: ${parts.dateTime}`);
+    if (transaction.cashier) infoLines.push(`Kasir: ${transaction.cashier}`);
+    if (transaction.staff) infoLines.push(`Mekanik: ${transaction.staff}`);
+    infoLines.push('--------------------------------');
 
+    // Build item lines dengan HTML (untuk nama wrap dan harga di kanan)
+    let itemsHtml = '';
     (transaction.items || []).forEach(it => {
-        const name = `${it.name} x${it.quantity}`;
+        const name = escapeHtml(`${it.name} x${it.quantity}`);
         const amt = `Rp ${formatNumber((Number(it.price) || 0) * (Number(it.quantity) || 0))}`;
-        bodyLines.push(lineLR(name, amt));
+        itemsHtml += `<div class="receipt-item"><span class="item-name">${name}</span><span class="item-price">${amt}</span></div>`;
     });
 
-    bodyLines.push('--------------------------------');
-    bodyLines.push(lineLR('Sub Total', `Rp ${formatNumber(subtotal)}`));
-    bodyLines.push(lineLR('Potongan', `-Rp ${formatNumber(discount)}`));
-    bodyLines.push(lineLR(`Pajak (${taxPercent}%)`, `Rp ${formatNumber(taxAmount)}`));
-    bodyLines.push(lineLR('TOTAL', `Rp ${formatNumber(total)}`));
-    bodyLines.push(lineLR('Dibayar', `Rp ${formatNumber(amountPaid)}`));
-    bodyLines.push(lineLR('Kembali', `Rp ${formatNumber(change)}`));
-    bodyLines.push('--------------------------------');
+    // Total section
+    const totalLines = [];
+    totalLines.push('--------------------------------');
+    totalLines.push(lineLR('Sub Total', `Rp ${formatNumber(subtotal)}`));
+    totalLines.push(lineLR('Potongan', `-Rp ${formatNumber(discount)}`));
+    totalLines.push(lineLR(`Pajak (${taxPercent}%)`, `Rp ${formatNumber(taxAmount)}`));
+    totalLines.push(lineLR('TOTAL', `Rp ${formatNumber(total)}`));
+    totalLines.push(lineLR('Dibayar', `Rp ${formatNumber(amountPaid)}`));
+    totalLines.push(lineLR('Kembali', `Rp ${formatNumber(change)}`));
+    totalLines.push('--------------------------------');
 
-    const receiptBodyText = escapeHtml(bodyLines.join('\n'));
+    const receiptInfoText = escapeHtml(infoLines.join('\n'));
+    const receiptTotalText = escapeHtml(totalLines.join('\n'));
     let receipt = `
         <div class="receipt">
             <div class="receipt-header">
                 <h1>DEWA BAN</h1>
                 <div class="receipt-address">
-                    <div>Jl. Wolter Monginsidi No.KM. 12</div>
-                    <div>Genuksari, Kec. Genuk, Semarang</div>
-                    <div>Telp: 0812-2259-9525</div>
+                    <div><b>Jl. Wolter Monginsidi No.KM. 12</b></div>
+                    <div><b>Genuksari, Kec. Genuk, Semarang</b></div>
+                    <div><b>Telp: 0812-2259-9525</b></div>
                 </div>
             </div>
             <div class="receipt-body">
-                <pre class="receipt-pre">${receiptBodyText}</pre>
+                <pre class="receipt-pre">${receiptInfoText}</pre>
+                <div class="receipt-items">${itemsHtml}</div>
+                <pre class="receipt-pre">${receiptTotalText}</pre>
             </div>
             <div class="receipt-footer">
-                <div>"YOUR TIRE SOLUTION"</div>
-                <div>TERIMA KASIH ATAS KUNJUNGAN ANDA</div>
-                <div>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</div>
+                <div><b>"YOUR TIRE SOLUTION"</b></div>
+                <div><b>TERIMA KASIH ATAS KUNJUNGAN ANDA</b></div>
+                <div><b>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</b></div>
             </div>
         </div>
     `;
@@ -1655,13 +1658,17 @@ function showReceipt(transaction) {
   @page { size: 58mm auto; margin: 0mm; }
   html, body { height: auto; overflow: visible; }
   body { width: 58mm; margin: 0; padding: 0; }
-  #print-area .receipt { width: 58mm; margin: 0; padding: 2mm; }
-  #print-area .receipt-pre { width: 58mm; margin: 0; padding: 0; white-space: pre-wrap; word-break: break-word; }
-  #print-area .receipt-header { text-align: center; margin: 0 0 6mm 0; }
-  #print-area .receipt-header h1 { font-weight: 900; font-size: 24px; font-style: italic; text-transform: uppercase; text-align: center; margin: 0 0 3mm 0; line-height: 1.1; }
-  #print-area .receipt-address { text-align: center; font-size: 10px; line-height: 1.25; }
+  #print-area .receipt { width: 58mm; margin: 0; padding: 2mm; font-family: 'Courier New', monospace; font-size: 11px; }
+  #print-area .receipt-pre { width: 58mm; margin: 0; padding: 0; white-space: pre-wrap; word-break: break-word; font-family: 'Courier New', monospace; font-size: 11px; }
+  #print-area .receipt-header { text-align: center; margin: 0 0 4mm 0; }
+  #print-area .receipt-header h1 { font-weight: 900; font-size: 24px; font-style: italic; text-transform: uppercase; text-align: center; margin: 0 0 2mm 0; line-height: 1.1; }
+  #print-area .receipt-address { text-align: center; font-size: 10px; line-height: 1.3; font-weight: bold; }
   #print-area .receipt-body { text-align: left; }
-  #print-area .receipt-footer { text-align: center; margin-top: 4mm; font-size: 10px; line-height: 1.25; }
+  #print-area .receipt-items { margin: 0; padding: 0; }
+  #print-area .receipt-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; margin-bottom: 1mm; }
+  #print-area .receipt-item .item-name { flex: 1; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; }
+  #print-area .receipt-item .item-price { flex-shrink: 0; text-align: right; white-space: nowrap; }
+  #print-area .receipt-footer { text-align: center; margin-top: 4mm; font-size: 10px; line-height: 1.3; }
 }
 @media screen {
   #print-area { display: none; }
