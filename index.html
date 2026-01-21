@@ -1,6 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -31,7 +31,8 @@
                 </div>
 
                 <div class="col d-flex align-items-center justify-content-end">
-                    <button type="button" class="btn btn-sm btn-outline-light me-3" id="open-admin-modal" aria-label="Admin">
+                    <button type="button" class="btn btn-sm btn-outline-light me-3" id="open-admin-modal"
+                        aria-label="Admin">
                         <i class="bi bi-gear"></i>
                     </button>
                     <div class="me-3">
@@ -55,7 +56,8 @@
                     <div class="card-body">
                         <div class="input-group mb-3">
                             <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            <input type="text" id="search-product" class="form-control" placeholder="Cari produk..." autocomplete="off" />
+                            <input type="text" id="search-product" class="form-control" placeholder="Cari produk..."
+                                autocomplete="off" />
                         </div>
                         <div class="row g-2" id="product-list"></div>
                     </div>
@@ -70,7 +72,8 @@
                                 <h5 class="mb-0">Transaksi</h5>
                             </div>
                             <div>
-                                <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-bs-toggle="modal" data-bs-target="#settingsModal" aria-label="Pengaturan">
+                                <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                    data-bs-toggle="modal" data-bs-target="#settingsModal" aria-label="Pengaturan">
                                     <i class="bi bi-gear"></i>
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-primary" aria-label="Member">
@@ -110,14 +113,16 @@
                             <div class="d-flex justify-content-between mb-2">
                                 <div class="d-flex align-items-center">
                                     <span>Diskon</span>
-                                    <input type="number" id="discount" class="form-control form-control-sm ms-2" style="width: 100px;" value="0" min="0" placeholder="Rp" />
+                                    <input type="number" id="discount" class="form-control form-control-sm ms-2"
+                                        style="width: 100px;" value="0" min="0" placeholder="Rp" />
                                 </div>
                                 <span id="discount-amount">Rp 0</span>
                             </div>
                             <div class="d-flex justify-content-between mb-2">
                                 <div class="d-flex align-items-center">
                                     <span>Pajak</span>
-                                    <input type="number" id="tax" class="form-control form-control-sm ms-2" style="width: 70px;" value="0" min="0" max="100" />
+                                    <input type="number" id="tax" class="form-control form-control-sm ms-2"
+                                        style="width: 70px;" value="0" min="0" max="100" />
                                     <span class="ms-1">%</span>
                                 </div>
                                 <span id="tax-amount">Rp 0</span>
@@ -159,7 +164,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Kembalian</label>
-                        <input type="text" class="form-control form-control-lg fw-bold text-success" id="change-amount" readonly />
+                        <input type="text" class="form-control form-control-lg fw-bold text-success" id="change-amount"
+                            readonly />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -203,23 +209,28 @@
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">
                     <h5 class="modal-title">Admin Inventory</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs" id="adminTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="stock-tab" data-bs-toggle="tab" data-bs-target="#stock-tab-pane" type="button" role="tab">Manage Stock</button>
+                            <button class="nav-link active" id="stock-tab" data-bs-toggle="tab"
+                                data-bs-target="#stock-tab-pane" type="button" role="tab">Manage Stock</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add-tab-pane" type="button" role="tab">Add New Item</button>
+                            <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add-tab-pane"
+                                type="button" role="tab">Add New Item</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-tab-pane" type="button" role="tab">Riwayat Transaksi</button>
+                            <button class="nav-link" id="history-tab" data-bs-toggle="tab"
+                                data-bs-target="#history-tab-pane" type="button" role="tab">Riwayat Transaksi</button>
                         </li>
                     </ul>
 
                     <div class="tab-content pt-3" id="adminTabsContent">
-                        <div class="tab-pane fade show active" id="stock-tab-pane" role="tabpanel" aria-labelledby="stock-tab" tabindex="0">
+                        <div class="tab-pane fade show active" id="stock-tab-pane" role="tabpanel"
+                            aria-labelledby="stock-tab" tabindex="0">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <div class="fw-semibold">Ringkasan Penjualan Hari Ini</div>
                                 <button type="button" class="btn btn-sm btn-outline-danger" id="admin-daily-refresh">
@@ -255,7 +266,8 @@
                             </div>
                             <div class="input-group mb-3">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                <input type="text" class="form-control" id="admin-stock-search" placeholder="Cari nama / brand..." autocomplete="off" />
+                                <input type="text" class="form-control" id="admin-stock-search"
+                                    placeholder="Cari nama / brand..." autocomplete="off" />
                             </div>
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle">
@@ -273,7 +285,8 @@
                             </div>
                         </div>
 
-                        <div class="tab-pane fade" id="add-tab-pane" role="tabpanel" aria-labelledby="add-tab" tabindex="0">
+                        <div class="tab-pane fade" id="add-tab-pane" role="tabpanel" aria-labelledby="add-tab"
+                            tabindex="0">
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label for="new-brand" class="form-label">Brand</label>
@@ -298,24 +311,26 @@
                                 </div>
                                 <div class="col-md-12">
                                     <label for="new-image" class="form-label">Image Path</label>
-                                    <input type="text" class="form-control" id="new-image" placeholder="img/no-image.png" />
+                                    <input type="text" class="form-control" id="new-image"
+                                        placeholder="img/no-image.png" />
                                 </div>
                                 <div class="col-12">
-                                    <button type="button" class="btn btn-danger" id="save-new-product">Simpan Produk Baru</button>
+                                    <button type="button" class="btn btn-danger" id="save-new-product">Simpan Produk
+                                        Baru</button>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="tab-pane fade" id="history-tab-pane" role="tabpanel" aria-labelledby="history-tab" tabindex="0">
+                        <div class="tab-pane fade" id="history-tab-pane" role="tabpanel" aria-labelledby="history-tab"
+                            tabindex="0">
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>No. Transaksi</th>
-                                            <th style="width: 170px;">Tanggal</th>
-                                            <th style="width: 140px;">Total</th>
-                                            <th style="width: 120px;">Aksi</th>
-                                            <th style="width: 60px;">Hapus</th>
+                                            <th style="text-align: left;">Barang</th>
+                                            <th style="width: 120px; text-align: center;">Total</th>
+                                            <th style="width: 80px; text-align: center;">Aksi</th>
+                                            <th style="width: 60px; text-align: center;">Hapus</th>
                                         </tr>
                                     </thead>
                                     <tbody id="admin-history-tbody"></tbody>
@@ -341,4 +356,5 @@
         }
     </script>
 </body>
+
 </html>
