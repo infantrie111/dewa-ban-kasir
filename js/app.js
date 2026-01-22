@@ -1372,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Display products in the product list
+// FIXED: Now displays brand logo from product.logo field instead of store logo
 function displayProducts(productsToDisplay) {
     if (productsToDisplay.length === 0) {
         const emptyState = document.createElement('div');
@@ -1384,10 +1385,16 @@ function displayProducts(productsToDisplay) {
     productsToDisplay.forEach(product => {
         const productCard = document.createElement('div');
         productCard.className = 'col-6 col-md-4 col-lg-3 mb-3';
-        const imgSrc = withCacheBuster(product.image);
+
+        // FIXED: Use product.logo (brand logo) as primary, fallback to product.image, then default
+        const logoSrc = product.logo && product.logo.trim() !== '' && product.logo !== 'img/logo.png'
+            ? product.logo
+            : (product.image || 'img/logo.png');
+        const finalImgSrc = withCacheBuster(logoSrc);
+
         productCard.innerHTML = `
             <div class="card product-card h-100" data-id="${product.id}">
-                <img src="${imgSrc}" class="card-img-top" alt="${product.name}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
+                <img src="${finalImgSrc}" class="card-img-top" alt="${product.name}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
                 <div class="card-body p-2">
                     <h6 class="card-title">${product.name}</h6>
                     <p class="card-text">Rp ${formatNumber(product.price)}</p>
@@ -1448,7 +1455,12 @@ function renderBrandList() {
     brands.forEach(brand => {
         const col = document.createElement('div');
         col.className = 'col-6 col-md-4 col-lg-3 mb-3';
-        const image = getBrandImage(brand);
+
+        // FIXED: Try to get brand logo from product.logo field first
+        const brandLogoFromProducts = getBrandLogoUrl(brand);
+        const image = brandLogoFromProducts !== 'img/logo.png'
+            ? brandLogoFromProducts
+            : getBrandImage(brand);
 
         col.innerHTML = `
             <div class="card product-card h-100" data-brand="${brand}">
@@ -1913,10 +1925,25 @@ function getUniqueBrands() {
 }
 
 // Get logo URL for a specific brand (from existing products)
+// FIXED: Properly retrieves logo from product.logo field
 function getBrandLogoUrl(brandName) {
     const brandUpper = brandName.toUpperCase();
-    const productWithLogo = products.find(p => p.brand.toUpperCase() === brandUpper && p.logo);
-    return productWithLogo?.logo || 'img/logo.png'; // Fallback to default if not found
+    // Search for any product with this brand that has a logo URL
+    const productWithLogo = products.find(p =>
+        p.brand.toUpperCase() === brandUpper &&
+        p.logo &&
+        p.logo.trim() !== '' &&
+        p.logo !== 'img/logo.png'
+    );
+
+    if (productWithLogo && productWithLogo.logo) {
+        console.log('✅ Found logo for brand:', brandName, '→', productWithLogo.logo);
+        return productWithLogo.logo;
+    }
+
+    // Fallback to default store logo if no brand logo found
+    console.log('⚠️ No logo found for brand:', brandName, '→ using default');
+    return 'img/logo.png';
 }
 
 // Populate brand dropdown with existing brands

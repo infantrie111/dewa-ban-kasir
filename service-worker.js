@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v18'; // v3.2.2 - CRITICAL FIX: Restore Missing Inputs & Layout Finalization
+const CACHE_NAME = 'dewa-ban-v19'; // v3.2.3 - BRAND LOGO FIX: Synchronize logo display in product cards
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
