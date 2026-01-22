@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v13'; // v3.0.0 - Finalisasi: Independent Scroll + Analytics Side-by-Side
+const CACHE_NAME = 'dewa-ban-v14'; // v3.0.1 - Bugfix: Hapus capture="environment" dari input file
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
