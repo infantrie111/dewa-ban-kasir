@@ -445,46 +445,231 @@ header {
     }
 }
 
-/* Phone Landscape specific */
+/* ========================================
+   PHONE LANDSCAPE MODE - OPTIMIZED LAYOUT
+   ======================================== */
+/* CRITICAL FIX: Daftar transaksi tidak terlihat karena terhimpit header & footer */
+
 @media (max-height: 500px) and (orientation: landscape) {
 
-    /* Very compact header */
+    /* === HEADER OPTIMIZATION === */
+    /* Kecilkan header agar tidak memakan ruang vertikal */
     .app-header {
-        padding: 0.25rem 0 !important;
+        padding: 0.2rem 0 !important;
+        min-height: 50px !important;
     }
 
+    /* Kecilkan logo di landscape */
     .main-logo {
-        height: 40px;
+        height: 35px !important;
+        max-height: 35px !important;
     }
 
+    .app-logo {
+        max-height: 35px !important;
+    }
+
+    /* Sembunyikan elemen non-penting di header */
     .app-header .col-auto>div {
         display: none !important;
         /* Hide "Developed by" section */
     }
 
-    /* Reduce main container top margin */
+    /* Sembunyikan tanggal/waktu di header untuk save space */
+    .app-header #current-date,
+    .app-header #transaction-date {
+        display: none !important;
+    }
+
+    /* Kompakkan spacing header */
+    header .container-fluid {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+    }
+
+    /* === MAIN CONTAINER OPTIMIZATION === */
+    /* Reduce margin top untuk container utama */
     .container-fluid.mt-3 {
-        margin-top: 0.5rem !important;
+        margin-top: 0.3rem !important;
     }
 
-    /* Very compact cart */
+    /* Reduce margin bottom pada cards */
+    .card {
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* === CART ITEMS (DAFTAR TRANSAKSI) === */
+    /* CRITICAL: Set dynamic max-height dengan overflow scroll */
     #cart-items {
-        max-height: 35vh;
-        min-height: 100px;
+        max-height: calc(100vh - 280px) !important;
+        /* 280px = header + footer summary + padding */
+        min-height: 120px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+
+        /* PENTING: Smooth scrolling for touch devices */
+        -webkit-overflow-scrolling: touch !important;
+        scroll-behavior: smooth !important;
+
+        /* Remove padding yang bisa bikin gap */
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0 !important;
+        /* ← HAPUS padding bottom untuk no gap */
     }
 
-    /* Smaller product cards */
+    /* CRITICAL: Hapus SEMUA margin-bottom pada cart items */
+    .cart-item {
+        padding: 0.4rem 0 !important;
+        margin-bottom: 0 !important;
+        /* ← NO GAP between items */
+        border-bottom: 1px dashed #e9ecef;
+    }
+
+    .cart-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0 !important;
+        padding-bottom: 0.4rem !important;
+    }
+
+    /* Kompakkan item name dan price */
+    .cart-item .item-name {
+        font-size: 0.85rem !important;
+        margin-bottom: 0.15rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .cart-item .item-price {
+        font-size: 0.75rem !important;
+    }
+
+    /* Quantity controls lebih compact */
+    .quantity-control .btn {
+        width: 25px !important;
+        height: 25px !important;
+        font-size: 0.75rem !important;
+        padding: 0 !important;
+    }
+
+    .quantity-control .form-control {
+        width: 40px !important;
+        height: 25px !important;
+        font-size: 0.8rem !important;
+        padding: 0.2rem !important;
+        margin: 0 3px !important;
+    }
+
+    /* === CART SUMMARY (FOOTER) === */
+    /* CRITICAL: Hapus margin-top agar rapat dengan daftar */
+    .cart-summary {
+        padding: 0.5rem 1rem !important;
+        margin-top: 0 !important;
+        /* ← HAPUS gap antara cart items dan summary */
+        background: white !important;
+        border-top: 2px solid #dee2e6 !important;
+        /* Visual separator tanpa gap */
+    }
+
+    /* Kompakkan spacing di summary */
+    .cart-summary .d-flex.justify-content-between {
+        margin-bottom: 0.3rem !important;
+    }
+
+    .cart-summary .d-flex.justify-content-between:last-of-type {
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Smaller font di summary */
+    .cart-summary span,
+    .cart-summary .form-control-sm {
+        font-size: 0.8rem !important;
+    }
+
+    /* Kompakkan input discount & tax */
+    .cart-summary .form-control-sm {
+        width: 60px !important;
+        height: 26px !important;
+        padding: 0.2rem 0.3rem !important;
+    }
+
+    /* Total yang lebih jelas tapi compact */
+    .cart-summary h4 {
+        font-size: 1.1rem !important;
+        margin-bottom: 0.4rem !important;
+    }
+
+    /* Tombol Proses Pembayaran lebih compact */
+    .cart-summary .btn-lg {
+        padding: 0.5rem 0.8rem !important;
+        font-size: 0.9rem !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Tombol Clear Cart juga compact */
+    #clear-cart-btn {
+        padding: 0.3rem 0.6rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    /* === PRODUCT CARDS === */
+    /* Smaller product cards in landscape */
     .product-card .card-img-top {
-        height: 70px;
+        height: 65px !important;
     }
 
     .product-card .card-body {
-        padding: 0.4rem;
+        padding: 0.35rem !important;
     }
 
     .product-card .card-title {
-        font-size: 0.75rem;
-        height: 30px;
+        font-size: 0.7rem !important;
+        height: 28px !important;
+        line-height: 1.2 !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    .product-card .card-text {
+        font-size: 0.75rem !important;
+    }
+
+    .product-card small {
+        font-size: 0.65rem !important;
+    }
+
+    /* === ADDITIONAL OPTIMIZATIONS === */
+    /* Reduce padding di kolom-kolom utama */
+    .transaction-column>.card {
+        padding: 0 !important;
+    }
+
+    .transaction-column .card-header {
+        padding: 0.4rem 0.8rem !important;
+        font-size: 0.9rem !important;
+    }
+
+    .transaction-column .card-body {
+        padding: 0 !important;
+    }
+
+    /* Empty cart message juga compact */
+    #cart-items .text-center {
+        padding: 1rem !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Smooth scrollbar di cart items */
+    #cart-items::-webkit-scrollbar {
+        width: 5px !important;
+    }
+
+    #cart-items::-webkit-scrollbar-thumb {
+        background: #aaa !important;
+        border-radius: 10px !important;
+    }
+
+    #cart-items::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
     }
 }
 

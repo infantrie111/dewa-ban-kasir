@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v19'; // v3.2.3 - BRAND LOGO FIX: Synchronize logo display in product cards
+const CACHE_NAME = 'dewa-ban-v20'; // v3.2.4 - LANDSCAPE FIX: Cart visibility optimization for phone landscape mode
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
