@@ -15,10 +15,20 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
+const storage = firebase.storage();
 
-// Set persistence to LOCAL (remember me)
+// Set persistence to LOCAL (remember me - keeps login state across browser sessions)
+// This must be called before any login attempt
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .catch(err => console.error('Auth persistence error:', err));
+    .then(() => {
+        console.log('✅ Auth persistence set to LOCAL - login akan bertahan');
+    })
+    .catch(err => {
+        console.error('❌ Auth persistence error:', err);
+        // Fallback: try again with SESSION at minimum
+        auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+            .catch(e => console.error('Session persistence also failed:', e));
+    });
 
 // Global auth state
 let currentUser = null;
@@ -158,6 +168,9 @@ const DEFAULT_PRODUCTS = [
 function withCacheBuster(url) {
     const s = String(url || '').trim();
     if (!s) return s;
+    // Skip cache buster for cloud URLs (Firebase Storage, etc.)
+    if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    // Only add cache buster for local img/ paths
     if (!s.startsWith('img/')) return s;
     if (s.includes('?')) return s;
     return `${s}?v=1`;
@@ -387,6 +400,8 @@ const clearCartBtn = document.getElementById('clear-cart-btn');
 const adminStockSearchInput = document.getElementById('admin-stock-search');
 const adminHistoryTbody = document.getElementById('admin-history-tbody');
 const adminHistoryTabBtn = document.getElementById('history-tab');
+const analyticsTabBtn = document.getElementById('analytics-tab');
+const refreshAnalyticsBtn = document.getElementById('refresh-analytics-btn');
 
 // Save cart to localStorage
 function saveCart() {
@@ -497,19 +512,27 @@ function initFirebaseTransactions() {
             // Juga simpan ke LocalStorage sebagai backup
             localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(firebaseTransactions));
 
-            // Refresh UI jika DOM sudah ready
-            if (typeof renderTransactionHistory === 'function') {
-                renderTransactionHistory();
-            }
-            if (typeof renderAdminDailyStats === 'function') {
-                renderAdminDailyStats();
-            }
             console.log('✅ Firebase transactions synced:', firebaseTransactions.length, 'items');
         } else {
+            // Data kosong di Firebase - reset array lokal juga
             console.log('⚠️ Firebase transactions kosong');
+            firebaseTransactions = [];
+            localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify([]));
+        }
+
+        // Set flag bahwa Firebase sudah ready untuk transactions
+        firebaseReady = true;
+
+        // Refresh UI jika DOM sudah ready
+        if (typeof renderTransactionHistory === 'function') {
+            renderTransactionHistory();
+        }
+        if (typeof renderAdminDailyStats === 'function') {
+            renderAdminDailyStats();
         }
     }, (error) => {
         console.error('❌ Firebase transactions listener error:', error);
+        firebaseReady = true; // Still set ready so local fallback works
     });
 }
 
@@ -562,6 +585,172 @@ function renderAdminDailyStats() {
     if (adminDailyTransactionsEl) adminDailyTransactionsEl.textContent = formatNumber(s.totalTransactions);
     if (adminDailyItemsEl) adminDailyItemsEl.textContent = `${formatNumber(s.totalItems)} pcs`;
     if (adminDailyProfitEl) adminDailyProfitEl.textContent = `Rp ${formatNumber(s.totalProfit)}`;
+}
+
+// ========================================
+// BUSINESS ANALYTICS FUNCTIONS
+// ========================================
+
+// Get products with critical stock (≤ 5 units)
+function getCriticalStockProducts() {
+    const criticalThreshold = 5;
+    return products
+        .filter(p => p.stock <= criticalThreshold)
+        .sort((a, b) => a.stock - b.stock); // Stok terendah di atas
+}
+
+// Get top selling products from all transaction history
+function getTopSellingProducts(limit = 5) {
+    const history = getTransactionHistory();
+    const salesMap = new Map(); // productId -> { name, brand, totalQty, totalRevenue }
+
+    history.forEach(transaction => {
+        const items = transaction?.items || [];
+        items.forEach(item => {
+            const id = item.id;
+            const name = item.name || 'Unknown';
+            const brand = item.brand || '';
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.price) || 0;
+            const revenue = qty * price;
+
+            if (salesMap.has(id)) {
+                const existing = salesMap.get(id);
+                existing.totalQty += qty;
+                existing.totalRevenue += revenue;
+            } else {
+                salesMap.set(id, {
+                    id,
+                    name,
+                    brand,
+                    totalQty: qty,
+                    totalRevenue: revenue
+                });
+            }
+        });
+    });
+
+    // Convert to array and sort by total quantity sold
+    return Array.from(salesMap.values())
+        .sort((a, b) => b.totalQty - a.totalQty)
+        .slice(0, limit);
+}
+
+// Render Business Analytics tab content
+function renderBusinessAnalytics() {
+    // Check authentication
+    if (!isAuthenticated || !currentUser) {
+        console.log('⚠️ Analytics skipped: User not authenticated');
+        return;
+    }
+
+    // === Critical Stock Section ===
+    const criticalStockEmpty = document.getElementById('critical-stock-empty');
+    const criticalStockTable = document.getElementById('critical-stock-table');
+    const criticalStockTbody = document.getElementById('critical-stock-tbody');
+    const criticalStockThead = criticalStockTable?.querySelector('thead');
+
+    const criticalProducts = getCriticalStockProducts();
+
+    if (criticalStockTbody) {
+        criticalStockTbody.innerHTML = '';
+
+        if (criticalProducts.length === 0) {
+            if (criticalStockEmpty) criticalStockEmpty.classList.remove('d-none');
+            if (criticalStockThead) criticalStockThead.classList.add('d-none');
+        } else {
+            if (criticalStockEmpty) criticalStockEmpty.classList.add('d-none');
+            if (criticalStockThead) criticalStockThead.classList.remove('d-none');
+
+            criticalProducts.forEach(p => {
+                const tr = document.createElement('tr');
+                const stockClass = p.stock === 0 ? 'bg-danger text-white fw-bold' : 'text-danger fw-bold';
+                const stockBadge = p.stock === 0
+                    ? '<span class="badge bg-dark">HABIS</span>'
+                    : `<span class="badge bg-danger">${p.stock}</span>`;
+
+                tr.innerHTML = `
+                    <td>
+                        <div class="fw-semibold">${p.name}</div>
+                        <small class="text-muted">${p.brand}</small>
+                    </td>
+                    <td class="text-center">${stockBadge}</td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-primary" 
+                                onclick="focusStockInput(${p.id})">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                    </td>
+                `;
+                criticalStockTbody.appendChild(tr);
+            });
+        }
+    }
+
+    // === Top Selling Products Section ===
+    const topProductsEmpty = document.getElementById('top-products-empty');
+    const topProductsTable = document.getElementById('top-products-table');
+    const topProductsTbody = document.getElementById('top-products-tbody');
+    const topProductsThead = topProductsTable?.querySelector('thead');
+
+    const topProducts = getTopSellingProducts(5);
+
+    if (topProductsTbody) {
+        topProductsTbody.innerHTML = '';
+
+        if (topProducts.length === 0) {
+            if (topProductsEmpty) topProductsEmpty.classList.remove('d-none');
+            if (topProductsThead) topProductsThead.classList.add('d-none');
+        } else {
+            if (topProductsEmpty) topProductsEmpty.classList.add('d-none');
+            if (topProductsThead) topProductsThead.classList.remove('d-none');
+
+            topProducts.forEach((p, index) => {
+                const tr = document.createElement('tr');
+                const rankBadge = index === 0
+                    ? '<span class="badge bg-warning text-dark"><i class="bi bi-trophy-fill"></i> 1</span>'
+                    : index === 1
+                        ? '<span class="badge bg-secondary">2</span>'
+                        : index === 2
+                            ? '<span class="badge bg-dark">3</span>'
+                            : `<span class="badge bg-light text-dark">${index + 1}</span>`;
+
+                tr.innerHTML = `
+                    <td class="text-center">${rankBadge}</td>
+                    <td>
+                        <div class="fw-semibold">${p.name}</div>
+                        <small class="text-muted">${p.brand}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-success">${formatNumber(p.totalQty)} pcs</span>
+                    </td>
+                    <td class="text-end fw-semibold text-success">Rp ${formatNumber(p.totalRevenue)}</td>
+                `;
+                topProductsTbody.appendChild(tr);
+            });
+        }
+    }
+
+    console.log('✅ Business analytics rendered:', criticalProducts.length, 'critical,', topProducts.length, 'top sellers');
+}
+
+// Helper function to focus on stock input in Manage Stock tab
+function focusStockInput(productId) {
+    // Switch to stock tab
+    const stockTab = document.getElementById('stock-tab');
+    if (stockTab) {
+        stockTab.click();
+
+        // Wait for tab switch, then scroll to and focus the input
+        setTimeout(() => {
+            const input = document.querySelector(`input[data-action="set"][data-id="${productId}"]`);
+            if (input) {
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                input.focus();
+                input.select();
+            }
+        }, 300);
+    }
 }
 
 function renderTransactionHistory() {
@@ -649,21 +838,41 @@ function deleteTransaction(transactionNo) {
         // Hapus dari Firebase
         db.ref('transactions/' + trx.firebaseId).remove()
             .then(() => {
-                console.log('✅ Transaksi berhasil dihapus dari Firebase');
+                console.log('✅ Transaksi berhasil dihapus dari Firebase:', txNo);
+
+                // Update array lokal segera untuk UI responsif
+                firebaseTransactions = firebaseTransactions.filter(
+                    t => String(t?.transactionNo || '') !== txNo
+                );
+
+                // Update localStorage juga
+                localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(firebaseTransactions));
+
+                // Refresh UI
+                renderTransactionHistory();
+                renderAdminDailyStats();
+
                 showAlert('Transaksi dihapus', 'success');
-                // UI akan auto-refresh via onAuthStateChanged listener
             })
             .catch(err => {
                 console.error('❌ Gagal menghapus transaksi dari Firebase:', err);
-                showAlert('Gagal menghapus transaksi', 'danger');
+                showAlert('Gagal menghapus transaksi: ' + err.message, 'danger');
             });
     } else {
         // Fallback: hapus dari localStorage saja
         const next = history.filter(t => String(t?.transactionNo || '') !== txNo);
         localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(next));
+
+        // Jika ada firebaseTransactions, update juga
+        if (firebaseTransactions.length > 0) {
+            firebaseTransactions = firebaseTransactions.filter(
+                t => String(t?.transactionNo || '') !== txNo
+            );
+        }
+
         renderTransactionHistory();
         renderAdminDailyStats();
-        showAlert('Transaksi dihapus (local)', 'success');
+        showAlert('Transaksi dihapus', 'success');
     }
 }
 
@@ -1022,6 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshAdminModal();
             renderAdminDailyStats();
             renderTransactionHistory();
+            renderBusinessAnalytics();
             modal.show();
         });
 
@@ -1029,6 +1239,7 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshAdminModal();
             renderAdminDailyStats();
             renderTransactionHistory();
+            renderBusinessAnalytics();
         });
     }
 
@@ -1041,6 +1252,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveNewProductBtn) {
         saveNewProductBtn.addEventListener('click', () => {
             addNewProductFromForm();
+        });
+    }
+
+    // Image preview when file is selected
+    if (newImageEl) {
+        newImageEl.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('image-preview');
+
+            if (file && preview) {
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    showAlert('File harus berupa gambar', 'warning');
+                    e.target.value = '';
+                    return;
+                }
+
+                // Validate file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    showAlert('Ukuran gambar maksimal 5MB', 'warning');
+                    e.target.value = '';
+                    return;
+                }
+
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    preview.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else if (preview) {
+                preview.src = 'img/logo.png';
+            }
         });
     }
 
@@ -1096,6 +1340,20 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshAdminModal();
             syncCartStockFromProducts();
             refreshCurrentProductView();
+        });
+    }
+
+    // Analytics tab event listeners
+    if (analyticsTabBtn) {
+        analyticsTabBtn.addEventListener('shown.bs.tab', () => {
+            renderBusinessAnalytics();
+        });
+    }
+
+    if (refreshAnalyticsBtn) {
+        refreshAnalyticsBtn.addEventListener('click', () => {
+            renderBusinessAnalytics();
+            showAlert('Data analisis diperbarui', 'success');
         });
     }
 
@@ -1377,7 +1635,201 @@ function updateProductStock(productId, newStock) {
     refreshAdminModal();
 }
 
-function addNewProductFromForm() {
+// ========================================
+// IMAGE UPLOAD FUNCTIONS
+// ========================================
+
+// Upload image to Firebase Storage
+async function uploadImageToStorage(file, productId) {
+    // Check authentication
+    if (!isAuthenticated || !currentUser) {
+        throw new Error('Anda harus login untuk mengupload gambar');
+    }
+
+    // Create a unique filename
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop().toLowerCase();
+    const filename = `products/${productId}_${timestamp}.${extension}`;
+
+    // Create storage reference
+    const storageRef = storage.ref(filename);
+
+    // Get UI elements for progress
+    const progressBar = document.getElementById('upload-progress');
+    const progressFill = progressBar?.querySelector('.progress-bar');
+    const uploadStatus = document.getElementById('upload-status');
+
+    return new Promise((resolve, reject) => {
+        // Start upload task
+        const uploadTask = storageRef.put(file);
+
+        // Show progress bar
+        if (progressBar) progressBar.classList.remove('d-none');
+        if (uploadStatus) {
+            uploadStatus.classList.remove('d-none');
+            uploadStatus.textContent = 'Mengupload gambar...';
+        }
+
+        // Monitor upload progress
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                if (progressFill) {
+                    progressFill.style.width = progress + '%';
+                }
+                if (uploadStatus) {
+                    uploadStatus.textContent = `Mengupload: ${Math.round(progress)}%`;
+                }
+            },
+            (error) => {
+                // Handle errors
+                console.error('Upload error:', error);
+                if (progressBar) progressBar.classList.add('d-none');
+                if (uploadStatus) {
+                    uploadStatus.classList.remove('d-none');
+                    uploadStatus.textContent = 'Upload gagal!';
+                    uploadStatus.classList.remove('text-muted');
+                    uploadStatus.classList.add('text-danger');
+                }
+                reject(error);
+            },
+            async () => {
+                // Upload complete, get download URL
+                try {
+                    const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
+                    if (progressBar) progressBar.classList.add('d-none');
+                    if (uploadStatus) {
+                        uploadStatus.textContent = 'Upload berhasil!';
+                        uploadStatus.classList.remove('text-muted');
+                        uploadStatus.classList.add('text-success');
+                    }
+                    console.log('✅ Image uploaded:', downloadURL);
+                    resolve(downloadURL);
+                } catch (error) {
+                    console.error('Error getting download URL:', error);
+                    reject(error);
+                }
+            }
+        );
+    });
+}
+
+// Compress image before upload with aggressive compression targeting 100KB-200KB
+function compressImage(file, targetMinSize = 100 * 1024, targetMaxSize = 200 * 1024) {
+    return new Promise((resolve) => {
+        // If file is already within target range, use it
+        if (file.size >= targetMinSize && file.size <= targetMaxSize) {
+            console.log(`Image already optimal: ${file.size} bytes`);
+            resolve(file);
+            return;
+        }
+
+        // If file is smaller than minimum, don't compress
+        if (file.size < targetMinSize) {
+            console.log(`Image too small to compress: ${file.size} bytes`);
+            resolve(file);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                // Helper function to compress with specific parameters
+                const compressWithParams = (maxWidth, quality) => {
+                    return new Promise((resolveCompress) => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Calculate new dimensions
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolveCompress(blob);
+                        }, 'image/jpeg', quality);
+                    });
+                };
+
+                // Iterative compression algorithm
+                const findOptimalCompression = async () => {
+                    const originalSize = file.size;
+
+                    // Start with aggressive settings for large files (5MB+)
+                    let maxWidth = originalSize > 5 * 1024 * 1024 ? 600 : 800;
+                    let quality = originalSize > 5 * 1024 * 1024 ? 0.6 : 0.7;
+
+                    let blob = await compressWithParams(maxWidth, quality);
+
+                    // If still too large, reduce further
+                    while (blob.size > targetMaxSize && (maxWidth > 400 || quality > 0.3)) {
+                        if (blob.size > targetMaxSize * 2) {
+                            // Much too large, reduce both dimensions and quality
+                            maxWidth = Math.max(400, Math.round(maxWidth * 0.8));
+                            quality = Math.max(0.3, quality - 0.1);
+                        } else {
+                            // Slightly too large, reduce quality only
+                            quality = Math.max(0.3, quality - 0.05);
+                        }
+                        blob = await compressWithParams(maxWidth, quality);
+                    }
+
+                    // If too small, try to increase quality (but prioritize speed)
+                    if (blob.size < targetMinSize && quality < 0.85) {
+                        quality = Math.min(0.85, quality + 0.1);
+                        const newBlob = await compressWithParams(maxWidth, quality);
+                        if (newBlob.size <= targetMaxSize) {
+                            blob = newBlob;
+                        }
+                    }
+
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+
+                    const compressionRatio = ((1 - compressedFile.size / originalSize) * 100).toFixed(1);
+                    console.log(`✅ Image compressed: ${Math.round(originalSize / 1024)}KB → ${Math.round(compressedFile.size / 1024)}KB (${compressionRatio}% reduction)`);
+
+                    resolve(compressedFile);
+                };
+
+                findOptimalCompression();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Reset upload UI state
+function resetUploadUI() {
+    const progressBar = document.getElementById('upload-progress');
+    const progressFill = progressBar?.querySelector('.progress-bar');
+    const uploadStatus = document.getElementById('upload-status');
+    const imagePreview = document.getElementById('image-preview');
+
+    if (progressBar) progressBar.classList.add('d-none');
+    if (progressFill) progressFill.style.width = '0%';
+    if (uploadStatus) {
+        uploadStatus.classList.add('d-none');
+        uploadStatus.textContent = '';
+        uploadStatus.classList.remove('text-success', 'text-danger');
+        uploadStatus.classList.add('text-muted');
+    }
+    if (imagePreview) imagePreview.src = 'img/logo.png';
+}
+
+async function addNewProductFromForm() {
     const brandRaw = (newBrandEl?.value || '').trim();
     const name = (newNameEl?.value || '').trim();
     const brand = brandRaw.toUpperCase();
@@ -1385,8 +1837,16 @@ function addNewProductFromForm() {
     const costRaw = (newCostPriceEl?.value ?? '').toString();
     const costPrice = costRaw.trim().length === 0 ? NaN : Number(costRaw);
     const stock = Math.max(0, Number(newStockEl?.value) || 0);
-    const image = ((newImageEl?.value || '').trim() || 'img/no-image.png');
 
+    // Get file from file input
+    const fileInput = newImageEl;
+    const file = fileInput?.files?.[0];
+
+    // Validation
+    if (!isAuthenticated || !currentUser) {
+        showAlert('Anda harus login untuk menambah produk', 'danger');
+        return;
+    }
     if (!brand) {
         showAlert('Brand wajib diisi', 'warning');
         return;
@@ -1404,28 +1864,66 @@ function addNewProductFromForm() {
         return;
     }
 
-    const newProduct = normalizeProduct({
-        id: getNextProductId(),
-        brand,
-        name,
-        price,
-        costPrice,
-        stock,
-        image
-    });
+    // Disable save button during processing
+    const saveBtn = document.getElementById('save-new-product');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+    }
 
-    products.push(newProduct);
-    saveProducts();
-    refreshCurrentProductView();
-    refreshAdminModal();
+    try {
+        const productId = getNextProductId();
+        let imageUrl = 'img/logo.png'; // Default fallback
 
-    if (newBrandEl) newBrandEl.value = '';
-    if (newNameEl) newNameEl.value = '';
-    if (newPriceEl) newPriceEl.value = '';
-    if (newCostPriceEl) newCostPriceEl.value = '';
-    if (newStockEl) newStockEl.value = '0';
-    if (newImageEl) newImageEl.value = '';
-    showAlert('Produk baru berhasil ditambahkan', 'success');
+        // Upload image if file is selected
+        if (file) {
+            try {
+                // Compress image before upload
+                const compressedFile = await compressImage(file);
+                imageUrl = await uploadImageToStorage(compressedFile, productId);
+            } catch (uploadError) {
+                console.error('Image upload failed:', uploadError);
+                showAlert('Gagal mengupload gambar: ' + uploadError.message, 'danger');
+                // Continue with default image
+                imageUrl = 'img/logo.png';
+            }
+        }
+
+        const newProduct = normalizeProduct({
+            id: productId,
+            brand,
+            name,
+            price,
+            costPrice,
+            stock,
+            image: imageUrl
+        });
+
+        products.push(newProduct);
+        saveProducts();
+        refreshCurrentProductView();
+        refreshAdminModal();
+
+        // Reset form
+        if (newBrandEl) newBrandEl.value = '';
+        if (newNameEl) newNameEl.value = '';
+        if (newPriceEl) newPriceEl.value = '';
+        if (newCostPriceEl) newCostPriceEl.value = '';
+        if (newStockEl) newStockEl.value = '0';
+        if (newImageEl) newImageEl.value = '';
+        resetUploadUI();
+
+        showAlert('Produk baru berhasil ditambahkan', 'success');
+    } catch (error) {
+        console.error('Error adding product:', error);
+        showAlert('Gagal menambahkan produk: ' + error.message, 'danger');
+    } finally {
+        // Re-enable save button
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Simpan Produk Baru';
+        }
+    }
 }
 
 // Add product to cart

@@ -113,23 +113,102 @@ header {
     color: #dc3545;
 }
 
+/* ========================================
+   INDEPENDENT SCROLL LAYOUT (Desktop)
+   ======================================== */
+
+/* Main container untuk layout 2 kolom dengan independent scroll */
+.main-pos-container {
+    height: calc(100vh - 100px);
+    /* Sesuaikan dengan tinggi header */
+    overflow: hidden;
+}
+
+.main-pos-container>.row {
+    height: 100%;
+}
+
+/* Kolom Produk - Independent scroll */
+.product-column {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.product-column>.card {
+    height: auto;
+    min-height: 100%;
+}
+
+/* Kolom Transaksi - Independent scroll dengan sticky summary */
+.transaction-column {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.transaction-column>.card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.transaction-column .card-body.p-0 {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Cart items area - scrollable */
 #cart-items {
-    max-height: 60vh;
-    min-height: 320px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 150px;
+    max-height: none;
+    /* Override previous max-height */
 }
 
-.cart-summary .d-flex.justify-content-between.mb-2 > span:first-child {
-    font-size: 0.9rem;
-}
-
-.cart-summary .d-flex.justify-content-between.mb-2 .d-flex.align-items-center > span:first-child {
-    font-size: 0.9rem;
-}
-
+/* Cart summary - sticky bottom */
 .cart-summary {
     position: sticky;
     bottom: 0;
     z-index: 2;
+    flex-shrink: 0;
+    background: white;
+}
+
+.cart-summary .d-flex.justify-content-between.mb-2>span:first-child {
+    font-size: 0.9rem;
+}
+
+.cart-summary .d-flex.justify-content-between.mb-2 .d-flex.align-items-center>span:first-child {
+    font-size: 0.9rem;
+}
+
+/* ========================================
+   ANALYTICS TAB - SIDE BY SIDE LAYOUT
+   ======================================== */
+
+/* Kontainer utama dengan flexbox */
+.analytics-container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: stretch;
+}
+
+/* Masing-masing section 50% lebar */
+.analytics-section {
+    flex: 1 1 50%;
+    min-width: 0;
+    /* Mencegah overflow */
+}
+
+.analytics-section .card {
+    margin-bottom: 0;
 }
 
 .quantity-control {
@@ -178,7 +257,150 @@ header {
     background: #a8a8a8;
 }
 
+/* ========================================
+   RESPONSIVE LAYOUT - MOBILE/TABLET
+   ======================================== */
+
+/* Tablet Portrait & Mobile Landscape: Stack vertically */
+@media (max-width: 991px) {
+
+    /* Disable independent scroll on mobile - use normal flow */
+    .main-pos-container {
+        height: auto;
+        overflow: visible;
+    }
+
+    .product-column,
+    .transaction-column {
+        height: auto;
+        overflow: visible;
+    }
+
+    .transaction-column>.card {
+        height: auto;
+        overflow: visible;
+    }
+
+    .transaction-column .card-body.p-0 {
+        overflow: visible;
+    }
+
+    /* Force main columns to stack */
+    .container-fluid>.row>.col-md-8,
+    .container-fluid>.row>.col-md-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Give product area full height before transaction */
+    .container-fluid>.row>.col-md-8 {
+        order: 1;
+        margin-bottom: 1rem;
+    }
+
+    /* Transaction area below product */
+    .container-fluid>.row>.col-md-4 {
+        order: 2;
+    }
+
+    /* Adjust cart height for stacked layout */
+    #cart-items {
+        max-height: 50vh;
+        min-height: 200px;
+        flex: none;
+    }
+
+    /* Product cards in mobile: 2 columns */
+    #product-list>.col-6,
+    #product-list>.col-md-4,
+    #product-list>.col-lg-3 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+/* Analytics Tab - Stack pada layar HP (max-width 768px) */
 @media (max-width: 768px) {
+    .analytics-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .analytics-section {
+        flex: 1 1 100%;
+    }
+
+    .analytics-section .card {
+        margin-bottom: 0;
+    }
+}
+
+/* Small mobile devices (max 576px) */
+@media (max-width: 576px) {
+    .container-fluid {
+        padding: 0 8px;
+    }
+
+    .product-card .card-img-top {
+        height: 90px;
+    }
+
+    .product-card .card-body {
+        padding: 0.5rem;
+    }
+
+    .product-card .card-title {
+        font-size: 0.8rem;
+        height: 35px;
+    }
+
+    .product-card .card-text {
+        font-size: 0.85rem;
+    }
+
+    .btn-lg {
+        padding: 0.5rem 1rem;
+        font-size: 0.95rem;
+    }
+
+    /* Header adjustments for small screens */
+    .app-header .container-fluid .row {
+        flex-wrap: wrap;
+    }
+
+    .app-header .col-auto {
+        flex: 0 0 100%;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .app-header .col {
+        flex: 0 0 100%;
+        justify-content: center;
+    }
+
+    .main-logo {
+        height: 50px;
+    }
+
+    /* Cart summary adjustments */
+    .cart-summary {
+        padding: 0.75rem !important;
+    }
+
+    .cart-summary .form-control-sm {
+        width: 70px !important;
+    }
+
+    #cart-items {
+        max-height: 40vh;
+        min-height: 150px;
+    }
+}
+
+/* Medium mobile devices (577px - 768px) */
+@media (min-width: 577px) and (max-width: 768px) {
     .container-fluid {
         padding: 0 10px;
     }
@@ -191,17 +413,78 @@ header {
         padding: 0.5rem 1rem;
         font-size: 1rem;
     }
+
+    /* 3 columns for tablets */
+    #product-list>.col-6,
+    #product-list>.col-md-4,
+    #product-list>.col-lg-3 {
+        flex: 0 0 33.333%;
+        max-width: 33.333%;
+    }
 }
 
+/* Tablet Landscape specific: Still stacked but more room */
 @media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-    #product-list > .col-6,
-    #product-list > .col-md-4 {
-        flex: 0 0 auto;
-        width: 25%;
+
+    /* Keep stacked layout but allow more product columns */
+    #product-list>.col-6,
+    #product-list>.col-md-4,
+    #product-list>.col-lg-3 {
+        flex: 0 0 25%;
+        max-width: 25%;
     }
 
     #cart-items {
-        max-height: 70vh;
+        max-height: 45vh;
+        min-height: 180px;
+    }
+
+    /* Cart items more compact */
+    .cart-item {
+        padding: 0.5rem 0;
+    }
+}
+
+/* Phone Landscape specific */
+@media (max-height: 500px) and (orientation: landscape) {
+
+    /* Very compact header */
+    .app-header {
+        padding: 0.25rem 0 !important;
+    }
+
+    .main-logo {
+        height: 40px;
+    }
+
+    .app-header .col-auto>div {
+        display: none !important;
+        /* Hide "Developed by" section */
+    }
+
+    /* Reduce main container top margin */
+    .container-fluid.mt-3 {
+        margin-top: 0.5rem !important;
+    }
+
+    /* Very compact cart */
+    #cart-items {
+        max-height: 35vh;
+        min-height: 100px;
+    }
+
+    /* Smaller product cards */
+    .product-card .card-img-top {
+        height: 70px;
+    }
+
+    .product-card .card-body {
+        padding: 0.4rem;
+    }
+
+    .product-card .card-title {
+        font-size: 0.75rem;
+        height: 30px;
     }
 }
 
@@ -216,13 +499,22 @@ header {
 }
 
 .btn-outline-secondary {
-    color: #6c757d;
-    border-color: #dee2e6;
+    color: #212529;
+    border-color: #212529;
+    background-color: transparent;
 }
 
 .btn-outline-secondary:hover {
-    background-color: #f8f9fa;
-    border-color: #dee2e6;
+    background-color: #212529;
+    border-color: #212529;
+    color: #fff;
+}
+
+.btn-outline-secondary:focus,
+.btn-outline-secondary:active {
+    background-color: #000;
+    border-color: #000;
+    color: #fff;
 }
 
 .form-control:focus,
@@ -259,6 +551,104 @@ header {
 /* Memastikan bar header cukup tinggi untuk logo besar */
 header .container-fluid .row {
     min-height: 0 !important;
+}
+
+/* ========================================
+   MODAL ADMIN RESPONSIVE LAYOUT
+   ======================================== */
+
+/* Responsive modal untuk landscape mode */
+@media (max-width: 991px) {
+    .modal-xl {
+        max-width: 95vw !important;
+        margin: 0.5rem auto;
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: 70vh;
+    }
+}
+
+/* Tablet/Phone Landscape: Pastikan modal tidak terpotong */
+@media (orientation: landscape) and (max-height: 768px) {
+    .modal-xl {
+        max-width: 98vw !important;
+        margin: 0.25rem auto;
+    }
+
+    .modal-dialog-scrollable {
+        max-height: 95vh;
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(95vh - 120px);
+        overflow-y: auto;
+    }
+
+    /* Pastikan tabs tidak terpotong dan bisa scroll horizontal */
+    .nav-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    .nav-tabs .nav-item {
+        flex: 0 0 auto;
+    }
+
+    .nav-tabs .nav-link {
+        white-space: nowrap;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* Small landscape mode (phones) */
+@media (max-height: 500px) and (orientation: landscape) {
+    .modal-dialog-scrollable {
+        max-height: 98vh;
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(98vh - 100px);
+    }
+
+    .modal-header {
+        padding: 0.5rem 1rem;
+    }
+
+    .modal-footer {
+        padding: 0.5rem 1rem;
+    }
+
+    /* Kompak table untuk analytics tab */
+    .table-sm td,
+    .table-sm th {
+        padding: 0.3rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Styling untuk Analytics Tab */
+#analytics-tab-pane .card {
+    margin-bottom: 1rem;
+}
+
+#analytics-tab-pane .table {
+    margin-bottom: 0;
+}
+
+#analytics-tab-pane .badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+}
+
+/* Memastikan text di analytics card tidak overflow */
+#analytics-tab-pane .fw-semibold {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 @media print {

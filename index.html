@@ -13,6 +13,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
     <!-- Bootstrap & Styles -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
@@ -46,9 +47,9 @@
         </div>
     </header>
 
-    <div class="container-fluid mt-3">
+    <div class="container-fluid mt-3 main-pos-container">
         <div class="row g-3">
-            <div class="col-md-8">
+            <div class="col-md-8 product-column">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="input-group mb-3">
@@ -61,7 +62,7 @@
                 </div>
             </div>
 
-            <div class="col-md-4">
+            <div class="col-md-4 transaction-column">
                 <div class="card h-100">
                     <div class="card-header bg-white border-0">
                         <div class="d-flex justify-content-between align-items-center">
@@ -253,18 +254,24 @@
                         aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+                    <ul class="nav nav-tabs flex-nowrap overflow-auto" id="adminTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="stock-tab" data-bs-toggle="tab"
+                            <button class="nav-link active text-nowrap" id="stock-tab" data-bs-toggle="tab"
                                 data-bs-target="#stock-tab-pane" type="button" role="tab">Manage Stock</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="add-tab" data-bs-toggle="tab" data-bs-target="#add-tab-pane"
-                                type="button" role="tab">Add New Item</button>
+                            <button class="nav-link text-nowrap" id="add-tab" data-bs-toggle="tab"
+                                data-bs-target="#add-tab-pane" type="button" role="tab">Add New Item</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="history-tab" data-bs-toggle="tab"
+                            <button class="nav-link text-nowrap" id="history-tab" data-bs-toggle="tab"
                                 data-bs-target="#history-tab-pane" type="button" role="tab">Riwayat Transaksi</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link text-nowrap" id="analytics-tab" data-bs-toggle="tab"
+                                data-bs-target="#analytics-tab-pane" type="button" role="tab">
+                                <i class="bi bi-graph-up-arrow me-1"></i>Analisis Bisnis
+                            </button>
                         </li>
                     </ul>
 
@@ -350,13 +357,32 @@
                                     <input type="number" class="form-control" id="new-stock" min="0" value="0" />
                                 </div>
                                 <div class="col-md-12">
-                                    <label for="new-image" class="form-label">Image Path</label>
-                                    <input type="text" class="form-control" id="new-image"
-                                        placeholder="img/no-image.png" />
+                                    <label for="new-image" class="form-label">Foto Produk</label>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div id="image-preview-container"
+                                            class="border rounded d-flex align-items-center justify-content-center"
+                                            style="width: 100px; height: 100px; overflow: hidden; background: #f8f9fa;">
+                                            <img id="image-preview" src="img/logo.png" alt="Preview"
+                                                style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <input type="file" class="form-control" id="new-image" accept="image/*"
+                                                capture="environment" />
+                                            <small class="text-muted d-block mt-1">
+                                                <i class="bi bi-camera me-1"></i>Pilih dari galeri atau ambil foto baru
+                                            </small>
+                                            <div id="upload-progress" class="progress mt-2 d-none" style="height: 8px;">
+                                                <div class="progress-bar bg-danger" role="progressbar"
+                                                    style="width: 0%"></div>
+                                            </div>
+                                            <small id="upload-status" class="text-muted d-none"></small>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-12">
-                                    <button type="button" class="btn btn-danger" id="save-new-product">Simpan Produk
-                                        Baru</button>
+                                    <button type="button" class="btn btn-danger" id="save-new-product">
+                                        <i class="bi bi-save me-2"></i>Simpan Produk Baru
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -375,6 +401,80 @@
                                     </thead>
                                     <tbody id="admin-history-tbody"></tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab Analisis Bisnis -->
+                        <div class="tab-pane fade" id="analytics-tab-pane" role="tabpanel"
+                            aria-labelledby="analytics-tab" tabindex="0">
+
+                            <!-- Kontainer Flex untuk Layout Bersebelahan -->
+                            <div class="analytics-container">
+                                <!-- Peringatan Stok Kritis (KIRI) -->
+                                <div class="analytics-section">
+                                    <div class="card border-danger h-100">
+                                        <div class="card-header bg-danger text-white d-flex align-items-center">
+                                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                            <span class="fw-semibold">Peringatan Stok Kritis (≤ 5 unit)</span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div id="critical-stock-empty" class="text-center text-muted py-4">
+                                                <i class="bi bi-check-circle-fill text-success fs-3 d-block mb-2"></i>
+                                                Tidak ada produk dengan stok kritis. Semua aman!
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0"
+                                                    id="critical-stock-table">
+                                                    <thead class="table-light d-none">
+                                                        <tr>
+                                                            <th>Produk</th>
+                                                            <th class="text-center" style="width: 100px;">Stok</th>
+                                                            <th class="text-center" style="width: 100px;">Aksi</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="critical-stock-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Top 5 Barang Terlaris (KANAN) -->
+                                <div class="analytics-section">
+                                    <div class="card border-success h-100">
+                                        <div class="card-header bg-success text-white d-flex align-items-center">
+                                            <i class="bi bi-trophy-fill me-2"></i>
+                                            <span class="fw-semibold">Top 5 Barang Terlaris</span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div id="top-products-empty" class="text-center text-muted py-4">
+                                                <i class="bi bi-bar-chart fs-3 d-block mb-2"></i>
+                                                Belum ada data penjualan untuk dianalisis.
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0" id="top-products-table">
+                                                    <thead class="table-light d-none">
+                                                        <tr>
+                                                            <th style="width: 50px;" class="text-center">#</th>
+                                                            <th>Produk</th>
+                                                            <th class="text-center" style="width: 100px;">Terjual</th>
+                                                            <th class="text-end" style="width: 140px;">Total Pendapatan
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="top-products-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Refresh Button -->
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-outline-danger" id="refresh-analytics-btn">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh Data Analisis
+                                </button>
                             </div>
                         </div>
                     </div>

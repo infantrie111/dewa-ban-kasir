@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v12';
+const CACHE_NAME = 'dewa-ban-v13'; // v3.0.0 - Finalisasi: Independent Scroll + Analytics Side-by-Side
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
