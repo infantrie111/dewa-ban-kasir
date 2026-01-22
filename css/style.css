@@ -560,10 +560,12 @@ header {
         margin: 0 3px !important;
     }
 
-    /* === CART SUMMARY (FOOTER) === */
-    /* CRITICAL: Hapus margin-top agar rapat dengan daftar */
+    /* === CART SUMMARY (FOOTER) - HORIZONTAL LAYOUT === */
+    /* CRITICAL V2: Transform Sub Total, Diskon, Pajak menjadi HORIZONTAL satu baris */
+    /* Ini menghemat ~60px ruang vertikal yang sangat critical! */
+
     .cart-summary {
-        padding: 0.5rem 1rem !important;
+        padding: 0.4rem 0.6rem !important;
         margin-top: 0 !important;
         /* ← HAPUS gap antara cart items dan summary */
         background: white !important;
@@ -571,45 +573,162 @@ header {
         /* Visual separator tanpa gap */
     }
 
-    /* Kompakkan spacing di summary */
-    .cart-summary .d-flex.justify-content-between {
-        margin-bottom: 0.3rem !important;
-    }
-
-    .cart-summary .d-flex.justify-content-between:last-of-type {
-        margin-bottom: 0.5rem !important;
-    }
-
-    /* Smaller font di summary */
-    .cart-summary span,
-    .cart-summary .form-control-sm {
-        font-size: 0.8rem !important;
-    }
-
-    /* Kompakkan input discount & tax */
-    .cart-summary .form-control-sm {
-        width: 60px !important;
-        height: 26px !important;
-        padding: 0.2rem 0.3rem !important;
-    }
-
-    /* Total yang lebih jelas tapi compact */
-    .cart-summary h4 {
-        font-size: 1.1rem !important;
-        margin-bottom: 0.4rem !important;
-    }
-
-    /* Tombol Proses Pembayaran lebih compact */
-    .cart-summary .btn-lg {
-        padding: 0.5rem 0.8rem !important;
-        font-size: 0.9rem !important;
+    /* TRANSFORM: Sub Total + Diskon + Pajak jadi HORIZONTAL satu baris */
+    .cart-summary>div:nth-child(1),
+    .cart-summary>div:nth-child(2),
+    .cart-summary>div:nth-child(3) {
+        /* Sub Total, Diskon, Pajak */
+        display: inline-flex !important;
+        align-items: center !important;
+        width: auto !important;
         margin-bottom: 0 !important;
+        margin-right: 0.5rem !important;
+        padding: 0.2rem 0.4rem !important;
+        background: #f8f9fa !important;
+        border-radius: 4px !important;
+        font-size: 0.65rem !important;
+        white-space: nowrap !important;
     }
 
-    /* Tombol Clear Cart juga compact */
-    #clear-cart-btn {
-        padding: 0.3rem 0.6rem !important;
+    /* Container untuk baris horizontal */
+    .cart-summary::before {
+        content: '';
+        display: block;
+        margin-bottom: 0.3rem;
+    }
+
+    /* Wrapper horizontal untuk 3 elemen pertama */
+    .cart-summary {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Buat wrapper untuk Sub Total, Diskon, Pajak horizontal */
+    .cart-summary>div:nth-child(1) {
+        order: 1;
+    }
+
+    .cart-summary>div:nth-child(2) {
+        order: 2;
+    }
+
+    .cart-summary>div:nth-child(3) {
+        order: 3;
+    }
+
+    /* Total tetap di bawah */
+    .cart-summary>div:nth-child(4) {
+        order: 4;
+        margin-top: 0.3rem !important;
+    }
+
+    /* Buttons tetap di paling bawah */
+    .cart-summary>div:nth-child(5) {
+        order: 5;
+        margin-top: 0.4rem !important;
+    }
+
+    /* ULTRA COMPACT: Semua label dan value */
+    .cart-summary span {
+        font-size: 0.65rem !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Input fields SUPER KECIL */
+    .cart-summary .form-control-sm {
+        width: 45px !important;
+        height: 20px !important;
+        font-size: 0.65rem !important;
+        padding: 0.1rem 0.2rem !important;
+        margin: 0 0.2rem !important;
+        border-radius: 2px !important;
+    }
+
+    /* Separator antara label dan value */
+    .cart-summary .d-flex.justify-content-between>span:first-child::after {
+        content: ':';
+        margin-left: 2px;
+        margin-right: 4px;
+    }
+
+    /* Kompakkan spacing antara elemen */
+    .cart-summary .d-flex.align-items-center {
+        gap: 0.15rem !important;
+    }
+
+    /* Total row tetap prominent tapi compact */
+    .cart-summary .fs-5 {
+        font-size: 0.95rem !important;
+        font-weight: 700 !important;
+        padding: 0.3rem 0 !important;
+        margin: 0.3rem 0 !important;
+        border-top: 1px solid #dee2e6 !important;
+    }
+
+    .cart-summary .fs-5 span {
+        font-size: 0.95rem !important;
+    }
+
+    /* Tombol Proses Pembayaran SUPER COMPACT */
+    .cart-summary .btn-lg {
+        padding: 0.4rem 0.6rem !important;
         font-size: 0.8rem !important;
+        margin-bottom: 0 !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Tombol Clear Cart bahkan lebih compact */
+    #clear-cart-btn {
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.7rem !important;
+        margin-top: 0.3rem !important;
+        line-height: 1 !important;
+    }
+
+    /* CRITICAL: Cart items harus flex-grow agar dapat ruang maksimal */
+    #cart-items {
+        flex-grow: 1 !important;
+        flex-shrink: 1 !important;
+        max-height: none !important;
+        /* Remove fixed max-height, let it grow */
+        min-height: 100px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+
+        /* PENTING: Smooth scrolling for touch devices */
+        -webkit-overflow-scrolling: touch !important;
+        scroll-behavior: smooth !important;
+
+        /* Remove padding yang bisa bikin gap */
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        padding-top: 0.4rem !important;
+        padding-bottom: 0 !important;
+    }
+
+    /* Card body harus flex column dengan proper sizing */
+    .transaction-column .card-body.p-0 {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+
+    /* Info mekanik/tanggal lebih compact */
+    .transaction-column .p-2.border-bottom {
+        padding: 0.3rem 0.6rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    .transaction-column .p-2.border-bottom .small {
+        font-size: 0.6rem !important;
+    }
+
+    .transaction-column .p-2.border-bottom>div>div {
+        font-size: 0.7rem !important;
+        line-height: 1.1 !important;
     }
 
     /* === PRODUCT CARDS === */

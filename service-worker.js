@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v20'; // v3.2.4 - LANDSCAPE FIX: Cart visibility optimization for phone landscape mode
+const CACHE_NAME = 'dewa-ban-v21'; // v3.2.5 - CRITICAL: Horizontal summary layout for landscape mode
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
