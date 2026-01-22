@@ -15,7 +15,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
-const storage = firebase.storage();
+// const storage = firebase.storage(); // ← Not used anymore (migrated to Cloudinary)
 
 // Set persistence to LOCAL (remember me - keeps login state across browser sessions)
 // This must be called before any login attempt
@@ -1639,79 +1639,140 @@ function updateProductStock(productId, newStock) {
 // IMAGE UPLOAD FUNCTIONS
 // ========================================
 
-// Upload image to Firebase Storage
+// Upload image to Cloudinary (Free tier, no billing issues!)
 async function uploadImageToStorage(file, productId) {
     // Check authentication
+    console.log('🔍 Upload Debug:', {
+        isAuthenticated,
+        currentUser: currentUser?.email,
+        uid: currentUser?.uid,
+        fileSize: `${Math.round(file.size / 1024)}KB`,
+        fileType: file.type
+    });
+
     if (!isAuthenticated || !currentUser) {
         throw new Error('Anda harus login untuk mengupload gambar');
     }
 
-    // Create a unique filename
-    const timestamp = Date.now();
-    const extension = file.name.split('.').pop().toLowerCase();
-    const filename = `products/${productId}_${timestamp}.${extension}`;
+    // Cloudinary configuration
+    const CLOUDINARY_CLOUD_NAME = 'dxdstqvad';
+    const CLOUDINARY_UPLOAD_PRESET = 'dewa_ban_preset';
+    const CLOUDINARY_FOLDER = 'produk_dewa_ban';
+    const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-    // Create storage reference
-    const storageRef = storage.ref(filename);
+    // Create unique public_id for the image
+    const timestamp = Date.now();
+    const publicId = `${CLOUDINARY_FOLDER}/${productId}_${timestamp}`;
+
+    console.log('📤 Uploading to Cloudinary:', publicId);
 
     // Get UI elements for progress
     const progressBar = document.getElementById('upload-progress');
     const progressFill = progressBar?.querySelector('.progress-bar');
     const uploadStatus = document.getElementById('upload-status');
 
-    return new Promise((resolve, reject) => {
-        // Start upload task
-        const uploadTask = storageRef.put(file);
-
+    try {
         // Show progress bar
         if (progressBar) progressBar.classList.remove('d-none');
         if (uploadStatus) {
             uploadStatus.classList.remove('d-none');
-            uploadStatus.textContent = 'Mengupload gambar...';
+            uploadStatus.textContent = 'Mengupload gambar ke Cloudinary...';
+            uploadStatus.classList.remove('text-danger', 'text-success');
+            uploadStatus.classList.add('text-muted');
         }
 
-        // Monitor upload progress
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                if (progressFill) {
-                    progressFill.style.width = progress + '%';
-                }
-                if (uploadStatus) {
-                    uploadStatus.textContent = `Mengupload: ${Math.round(progress)}%`;
-                }
-            },
-            (error) => {
-                // Handle errors
-                console.error('Upload error:', error);
-                if (progressBar) progressBar.classList.add('d-none');
-                if (uploadStatus) {
-                    uploadStatus.classList.remove('d-none');
-                    uploadStatus.textContent = 'Upload gagal!';
-                    uploadStatus.classList.remove('text-muted');
-                    uploadStatus.classList.add('text-danger');
-                }
-                reject(error);
-            },
-            async () => {
-                // Upload complete, get download URL
-                try {
-                    const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                    if (progressBar) progressBar.classList.add('d-none');
-                    if (uploadStatus) {
-                        uploadStatus.textContent = 'Upload berhasil!';
-                        uploadStatus.classList.remove('text-muted');
-                        uploadStatus.classList.add('text-success');
-                    }
-                    console.log('✅ Image uploaded:', downloadURL);
-                    resolve(downloadURL);
-                } catch (error) {
-                    console.error('Error getting download URL:', error);
-                    reject(error);
-                }
+        // Simulate progress (Cloudinary doesn't provide real-time progress via fetch)
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            if (progress <= 90 && progressFill) {
+                progressFill.style.width = progress + '%';
             }
-        );
-    });
+        }, 200);
+
+        // Prepare FormData
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+        formData.append('public_id', publicId);
+        formData.append('folder', CLOUDINARY_FOLDER);
+
+        console.log('📦 FormData prepared:', {
+            fileSize: file.size,
+            fileName: file.name,
+            uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+            publicId: publicId
+        });
+
+        // Upload to Cloudinary
+        const response = await fetch(CLOUDINARY_URL, {
+            method: 'POST',
+            body: formData
+        });
+
+        // Clear progress interval
+        clearInterval(progressInterval);
+
+        // Check response
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Cloudinary upload failed: ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        // Parse response
+        const data = await response.json();
+
+        console.log('✅ Cloudinary response:', {
+            secure_url: data.secure_url,
+            public_id: data.public_id,
+            format: data.format,
+            width: data.width,
+            height: data.height,
+            bytes: data.bytes
+        });
+
+        // Complete progress bar
+        if (progressFill) progressFill.style.width = '100%';
+
+        // Hide progress bar and show success
+        setTimeout(() => {
+            if (progressBar) progressBar.classList.add('d-none');
+            if (uploadStatus) {
+                uploadStatus.textContent = 'Upload berhasil!';
+                uploadStatus.classList.remove('text-muted');
+                uploadStatus.classList.add('text-success');
+            }
+        }, 500);
+
+        console.log('✅ Image uploaded successfully:', data.secure_url);
+
+        // Return the secure URL (this will be saved to Firebase Realtime Database)
+        return data.secure_url;
+
+    } catch (error) {
+        // Clear progress interval if any
+        if (progressInterval) clearInterval(progressInterval);
+
+        // Handle errors dengan detail logging
+        console.error('❌ Cloudinary upload error:', {
+            message: error.message,
+            error: error
+        });
+
+        // Show user-friendly error message
+        const errorMessage = `Upload gagal: ${error.message}`;
+
+        if (progressBar) progressBar.classList.add('d-none');
+        if (uploadStatus) {
+            uploadStatus.classList.remove('d-none');
+            uploadStatus.textContent = errorMessage;
+            uploadStatus.classList.remove('text-muted', 'text-success');
+            uploadStatus.classList.add('text-danger');
+        }
+
+        // Re-throw error untuk di-handle oleh caller
+        throw error;
+    }
 }
 
 // Compress image before upload with aggressive compression targeting 100KB-200KB

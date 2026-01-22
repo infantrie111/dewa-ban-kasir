@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v14'; // v3.0.1 - Bugfix: Hapus capture="environment" dari input file
+const CACHE_NAME = 'dewa-ban-v15'; // v3.1.0 - Migration: Firebase Storage → Cloudinary
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
