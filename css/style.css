@@ -114,6 +114,46 @@ header {
 }
 
 /* ========================================
+   BRAND LOGO BADGE (Product Card)
+   ======================================== */
+
+/* Brand logo badge - small overlay on top-right */
+.brand-logo-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 35px;
+    height: 35px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    z-index: 10;
+    border: 2px solid #f8f9fa;
+}
+
+.brand-logo-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Product card needs position relative for badge positioning */
+.product-card {
+    position: relative;
+}
+
+/* Main product image */
+.product-main-image {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+}
+
+/* ========================================
    INDEPENDENT SCROLL LAYOUT (Desktop)
    ======================================== */
 
@@ -560,140 +600,161 @@ header {
         margin: 0 3px !important;
     }
 
-    /* === CART SUMMARY (FOOTER) - HORIZONTAL LAYOUT === */
-    /* CRITICAL V2: Transform Sub Total, Diskon, Pajak menjadi HORIZONTAL satu baris */
-    /* Ini menghemat ~60px ruang vertikal yang sangat critical! */
+    /* === CART SUMMARY (FOOTER) - CSS GRID 3 KOLOM === */
+    /* V3: CSS GRID untuk layout horizontal yang lebih efisien */
+    /* Menghemat ~60px ruang vertikal dengan Grid 3 kolom */
 
     .cart-summary {
-        padding: 0.4rem 0.6rem !important;
+        padding: 0.3rem 0.5rem !important;
         margin-top: 0 !important;
-        /* ← HAPUS gap antara cart items dan summary */
         background: white !important;
         border-top: 2px solid #dee2e6 !important;
-        /* Visual separator tanpa gap */
+        display: grid !important;
+        grid-template-columns: 1fr 1fr 1fr !important;
+        /* 3 kolom equal */
+        grid-template-rows: auto auto auto !important;
+        gap: 0.25rem !important;
+        align-items: start !important;
     }
 
-    /* TRANSFORM: Sub Total + Diskon + Pajak jadi HORIZONTAL satu baris */
-    .cart-summary>div:nth-child(1),
-    .cart-summary>div:nth-child(2),
-    .cart-summary>div:nth-child(3) {
-        /* Sub Total, Diskon, Pajak */
-        display: inline-flex !important;
-        align-items: center !important;
-        width: auto !important;
-        margin-bottom: 0 !important;
-        margin-right: 0.5rem !important;
-        padding: 0.2rem 0.4rem !important;
-        background: #f8f9fa !important;
-        border-radius: 4px !important;
-        font-size: 0.65rem !important;
-        white-space: nowrap !important;
-    }
-
-    /* Container untuk baris horizontal */
-    .cart-summary::before {
-        content: '';
-        display: block;
-        margin-bottom: 0.3rem;
-    }
-
-    /* Wrapper horizontal untuk 3 elemen pertama */
-    .cart-summary {
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Buat wrapper untuk Sub Total, Diskon, Pajak horizontal */
+    /* SUB TOTAL - Grid Cell 1,1 */
     .cart-summary>div:nth-child(1) {
-        order: 1;
+        grid-column: 1 / 2 !important;
+        grid-row: 1 / 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        font-size: 0.6rem !important;
+        padding: 0.2rem 0.3rem !important;
+        background: #f8f9fa !important;
+        border-radius: 3px !important;
+        margin: 0 !important;
     }
 
+    /* DISKON - Grid Cell 2,1 */
     .cart-summary>div:nth-child(2) {
-        order: 2;
+        grid-column: 2 / 3 !important;
+        grid-row: 1 / 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        font-size: 0.6rem !important;
+        padding: 0.2rem 0.3rem !important;
+        background: #fff3cd !important;
+        border-radius: 3px !important;
+        margin: 0 !important;
     }
 
+    /* PAJAK - Grid Cell 3,1 */
     .cart-summary>div:nth-child(3) {
-        order: 3;
+        grid-column: 3 / 4 !important;
+        grid-row: 1 / 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        font-size: 0.6rem !important;
+        padding: 0.2rem 0.3rem !important;
+        background: #d1ecf1 !important;
+        border-radius: 3px !important;
+        margin: 0 !important;
     }
 
-    /* Total tetap di bawah */
+    /* TOTAL - Grid Cell span 3 kolom, row 2 */
     .cart-summary>div:nth-child(4) {
-        order: 4;
-        margin-top: 0.3rem !important;
+        grid-column: 1 / 4 !important;
+        grid-row: 2 / 3 !important;
+        margin: 0 !important;
+        padding: 0.25rem 0 !important;
+        border-top: 1px solid #dee2e6 !important;
+        font-size: 0.85rem !important;
+        font-weight: 700 !important;
     }
 
-    /* Buttons tetap di paling bawah */
+    /* BUTTONS - Grid Cell span 3 kolom, row 3 */
     .cart-summary>div:nth-child(5) {
-        order: 5;
-        margin-top: 0.4rem !important;
+        grid-column: 1 / 4 !important;
+        grid-row: 3 / 4 !important;
+        margin: 0 !important;
+        padding-top: 0.3rem !important;
     }
 
-    /* ULTRA COMPACT: Semua label dan value */
-    .cart-summary span {
-        font-size: 0.65rem !important;
-        line-height: 1 !important;
+    /* ULTRA COMPACT: Semua span di dalam grid cells */
+    .cart-summary>div:nth-child(1) span,
+    .cart-summary>div:nth-child(2) span,
+    .cart-summary>div:nth-child(3) span {
+        font-size: 0.6rem !important;
+        line-height: 1.1 !important;
         margin: 0 !important;
         padding: 0 !important;
+        display: block !important;
     }
 
-    /* Input fields SUPER KECIL */
+    /* Labels lebih kecil */
+    .cart-summary>div:nth-child(1)>span:first-child,
+    .cart-summary>div:nth-child(2)>div>span:first-child,
+    .cart-summary>div:nth-child(3)>div>span:first-child {
+        font-size: 0.55rem !important;
+        opacity: 0.7 !important;
+        margin-bottom: 0.1rem !important;
+    }
+
+    /* Input fields SUPER KECIL di grid */
     .cart-summary .form-control-sm {
-        width: 45px !important;
-        height: 20px !important;
-        font-size: 0.65rem !important;
+        width: 100% !important;
+        max-width: 50px !important;
+        height: 18px !important;
+        font-size: 0.6rem !important;
         padding: 0.1rem 0.2rem !important;
-        margin: 0 0.2rem !important;
+        margin: 0.1rem 0 !important;
         border-radius: 2px !important;
     }
 
-    /* Separator antara label dan value */
-    .cart-summary .d-flex.justify-content-between>span:first-child::after {
-        content: ':';
-        margin-left: 2px;
-        margin-right: 4px;
-    }
-
-    /* Kompakkan spacing antara elemen */
-    .cart-summary .d-flex.align-items-center {
+    /* Nested flex untuk Diskon & Pajak inputs */
+    .cart-summary>div:nth-child(2) .d-flex,
+    .cart-summary>div:nth-child(3) .d-flex {
+        flex-wrap: wrap !important;
         gap: 0.15rem !important;
+        width: 100% !important;
     }
 
-    /* Total row tetap prominent tapi compact */
+    /* Total row styling */
     .cart-summary .fs-5 {
-        font-size: 0.95rem !important;
+        font-size: 0.85rem !important;
         font-weight: 700 !important;
-        padding: 0.3rem 0 !important;
-        margin: 0.3rem 0 !important;
-        border-top: 1px solid #dee2e6 !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
 
     .cart-summary .fs-5 span {
-        font-size: 0.95rem !important;
+        font-size: 0.85rem !important;
     }
 
     /* Tombol Proses Pembayaran SUPER COMPACT */
     .cart-summary .btn-lg {
-        padding: 0.4rem 0.6rem !important;
-        font-size: 0.8rem !important;
+        padding: 0.35rem 0.5rem !important;
+        font-size: 0.75rem !important;
         margin-bottom: 0 !important;
         line-height: 1.2 !important;
+        width: 100% !important;
     }
 
-    /* Tombol Clear Cart bahkan lebih compact */
+    /* Tombol Clear Cart */
     #clear-cart-btn {
-        padding: 0.25rem 0.5rem !important;
-        font-size: 0.7rem !important;
-        margin-top: 0.3rem !important;
+        padding: 0.25rem 0.4rem !important;
+        font-size: 0.65rem !important;
+        margin-top: 0.25rem !important;
         line-height: 1 !important;
+        width: 100% !important;
     }
 
-    /* CRITICAL: Cart items harus flex-grow agar dapat ruang maksimal */
+    /* CRITICAL: Cart items dengan minimum 150px height */
     #cart-items {
         flex-grow: 1 !important;
         flex-shrink: 1 !important;
+        min-height: 150px !important;
+        /* MINIMUM 150px untuk scroll */
         max-height: none !important;
-        /* Remove fixed max-height, let it grow */
-        min-height: 100px !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
 
@@ -701,11 +762,23 @@ header {
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
 
-        /* Remove padding yang bisa bikin gap */
-        padding-left: 0.6rem !important;
-        padding-right: 0.6rem !important;
-        padding-top: 0.4rem !important;
-        padding-bottom: 0 !important;
+        /* HAPUS SEMUA padding/margin berlebih */
+        padding: 0.3rem 0.5rem 0 0.5rem !important;
+        margin: 0 !important;
+    }
+
+    /* HAPUS margin/padding berlebih pada cart-item */
+    .cart-item {
+        padding: 0.3rem 0 !important;
+        margin: 0 !important;
+        /* NO margin! */
+        border-bottom: 1px dashed #e9ecef;
+    }
+
+    .cart-item:last-child {
+        border-bottom: none;
+        margin: 0 !important;
+        padding-bottom: 0.3rem !important;
     }
 
     /* Card body harus flex column dengan proper sizing */
@@ -714,20 +787,21 @@ header {
         flex-direction: column !important;
         height: 100% !important;
         overflow: hidden !important;
+        padding: 0 !important;
     }
 
     /* Info mekanik/tanggal lebih compact */
     .transaction-column .p-2.border-bottom {
-        padding: 0.3rem 0.6rem !important;
-        font-size: 0.7rem !important;
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.65rem !important;
     }
 
     .transaction-column .p-2.border-bottom .small {
-        font-size: 0.6rem !important;
+        font-size: 0.55rem !important;
     }
 
     .transaction-column .p-2.border-bottom>div>div {
-        font-size: 0.7rem !important;
+        font-size: 0.65rem !important;
         line-height: 1.1 !important;
     }
 

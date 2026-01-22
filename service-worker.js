@@ -1,10 +1,11 @@
-const CACHE_NAME = 'dewa-ban-v21'; // v3.2.5 - CRITICAL: Horizontal summary layout for landscape mode
+const CACHE_NAME = 'dewa-ban-v26'; // v3.3.4 - POLISH: Professional placeholders & brand list improvements
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
   './manifest.json',
+  './img/logo.png',
   './img/jasa.png'
 ];
 

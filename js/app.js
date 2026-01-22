@@ -1372,7 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Display products in the product list
-// FIXED: Now displays brand logo from product.logo field instead of store logo
+// V2: SEPARATED brand logo and product photo for better visual hierarchy
 function displayProducts(productsToDisplay) {
     if (productsToDisplay.length === 0) {
         const emptyState = document.createElement('div');
@@ -1386,15 +1386,30 @@ function displayProducts(productsToDisplay) {
         const productCard = document.createElement('div');
         productCard.className = 'col-6 col-md-4 col-lg-3 mb-3';
 
-        // FIXED: Use product.logo (brand logo) as primary, fallback to product.image, then default
-        const logoSrc = product.logo && product.logo.trim() !== '' && product.logo !== 'img/logo.png'
+        // SEPARATED LOGIC: Brand Logo vs Product Photo
+        // 1. Brand Logo (small badge) - prioritized from product.logo field
+        const brandLogo = product.logo && product.logo.trim() !== '' && product.logo !== 'img/logo.png'
             ? product.logo
-            : (product.image || 'img/logo.png');
-        const finalImgSrc = withCacheBuster(logoSrc);
+            : 'img/logo.png';
+        const brandLogoSrc = withCacheBuster(brandLogo);
+
+        // 2. Product Photo (main image) - from product.image field
+        // Placeholder 'Ikon Ban Abu-abu' (Cloudinary) used if photo is missing
+        const productPhoto = product.image && product.image.trim() !== '' && product.image !== 'img/logo.png'
+            ? product.image
+            : 'https://res.cloudinary.com/dxdstqvad/image/upload/v1737597143/produk_dewa_ban/placeholder_tire_grey.png'; // <-- placeholder ban abu-abu elegan
+        const productPhotoSrc = withCacheBuster(productPhoto);
 
         productCard.innerHTML = `
             <div class="card product-card h-100" data-id="${product.id}">
-                <img src="${finalImgSrc}" class="card-img-top" alt="${product.name}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
+                <!-- Brand Logo Badge (Overlay) -->
+                <div class="brand-logo-badge">
+                    <img src="${brandLogoSrc}" alt="${product.brand}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
+                </div>
+                
+                <!-- Main Product Photo -->
+                <img src="${productPhotoSrc}" class="card-img-top product-main-image" alt="${product.name}" onerror="this.onerror=null;this.src='https://res.cloudinary.com/dxdstqvad/image/upload/v1737597143/produk_dewa_ban/placeholder_tire_grey.png';">
+                
                 <div class="card-body p-2">
                     <h6 class="card-title">${product.name}</h6>
                     <p class="card-text">Rp ${formatNumber(product.price)}</p>
@@ -1456,15 +1471,19 @@ function renderBrandList() {
         const col = document.createElement('div');
         col.className = 'col-6 col-md-4 col-lg-3 mb-3';
 
-        // FIXED: Try to get brand logo from product.logo field first
-        const brandLogoFromProducts = getBrandLogoUrl(brand);
-        const image = brandLogoFromProducts !== 'img/logo.png'
-            ? brandLogoFromProducts
-            : getBrandImage(brand);
+        // PRIORITIZED: Cloudinary URL from database (Link Internet)
+        // Logika: Cari produk dari brand ini yang punya field logo berupa URL
+        const internetLogo = products.find(p =>
+            p.brand.toUpperCase() === brand.toUpperCase() &&
+            p.logo &&
+            p.logo.startsWith('http')
+        )?.logo;
+
+        const image = internetLogo || getBrandImage(brand);
 
         col.innerHTML = `
             <div class="card product-card h-100" data-brand="${brand}">
-                <img src="${image}" class="card-img-top" alt="${brand}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
+                <img src="${image}" class="card-img-top" alt="${brand}" onerror="this.onerror=null;this.src='https://res.cloudinary.com/dxdstqvad/image/upload/v1737597143/produk_dewa_ban/placeholder_tire_grey.png';">
                 <div class="card-body p-2 text-center">
                     <h6 class="card-title mb-0">${brand}</h6>
                 </div>
