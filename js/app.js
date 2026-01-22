@@ -466,9 +466,9 @@ function setHeaderDateTime() {
     const now = new Date();
     const parts = formatDateTimeParts(now);
     const formatted = now.toLocaleDateString('id-ID', { weekday: 'long' });
-    const text = `${formatted}, ${parts.date} ${parts.time}`;
+    const timeHtml = `${parts.time.slice(0, 5)}<span class="d-none d-sm-inline">${parts.time.slice(5)}</span>`;
     document.querySelectorAll('#current-date, #transaction-date').forEach(el => {
-        el.textContent = text;
+        el.innerHTML = `<span class="d-none d-sm-inline">${formatted}, </span>${parts.date} ${timeHtml}`;
     });
 }
 
@@ -1469,7 +1469,7 @@ function renderBrandList() {
 
     brands.forEach(brand => {
         const col = document.createElement('div');
-        col.className = 'col-6 col-md-4 col-lg-3 mb-3';
+        col.className = 'col-3 col-md-4 col-lg-3 mb-3';
 
         // PRIORITIZED: Aggressively search for Cloudinary URL in ALL products of this brand
         // Logika: Scan seluruh database (find) untuk menemukan satu produk dari brand ini yang punya logo URL valid

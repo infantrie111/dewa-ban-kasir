@@ -98,6 +98,10 @@ header {
     white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
+    display: block !important;
+    color: #212529 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .cart-item .item-price {
@@ -106,6 +110,8 @@ header {
     white-space: normal;
     overflow-wrap: anywhere;
     word-break: break-word;
+    display: block !important;
+    visibility: visible !important;
 }
 
 .cart-item .item-total {
@@ -206,7 +212,7 @@ header {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    min-height: 150px;
+    min-height: 100px !important;
     max-height: none;
     /* Override previous max-height */
 }
@@ -302,7 +308,7 @@ header {
    ======================================== */
 
 /* Tablet Portrait & Mobile Landscape: Stack vertically */
-@media (max-width: 991px) {
+@media (max-width: 767px) {
 
     /* Disable independent scroll on mobile - use normal flow */
     .main-pos-container {
@@ -382,6 +388,76 @@ header {
         padding: 0 8px;
     }
 
+    /* Header HP Modern: 2 Kolom Horizontal */
+    .app-header .row {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 0;
+    }
+
+    .app-header .col-auto {
+        width: auto;
+        flex: 0 0 auto;
+        margin-bottom: 0;
+        padding-right: 0;
+    }
+
+    .app-header .col {
+        width: auto;
+        flex: 1 1 auto;
+        display: flex;
+        justify-content: flex-end;
+        padding-left: 0.5rem;
+    }
+
+    /* Info Kasir Rata Kanan */
+    .app-header .col>div {
+        text-align: right !important;
+    }
+
+    .app-header .col .d-flex {
+        flex-direction: column !important;
+        align-items: flex-end !important;
+    }
+
+    /* Hide 'Developed by' section on mobile */
+    .app-header .col-auto .border-start {
+        display: none !important;
+    }
+
+    /* Hide seconds in time display */
+    .app-header .d-none.d-sm-inline {
+        display: none !important;
+    }
+
+    /* Compact header text */
+    .app-header .small {
+        font-size: 0.65rem !important;
+    }
+
+    .app-header .fw-bold {
+        font-size: 0.75rem !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Logo kecil di kiri */
+    .main-logo {
+        max-height: 40px !important;
+        height: 40px !important;
+    }
+
+    /* Brand List 4-Column Optimization */
+    .product-card[data-brand] .card-img-top {
+        height: 65px !important;
+    }
+
+    .product-card[data-brand] .card-body {
+        display: none !important;
+    }
+
+    /* Standard Product adjustments */
     .product-card .card-img-top {
         height: 90px;
     }
@@ -404,25 +480,7 @@ header {
         font-size: 0.95rem;
     }
 
-    /* Header adjustments for small screens */
-    .app-header .container-fluid .row {
-        flex-wrap: wrap;
-    }
 
-    .app-header .col-auto {
-        flex: 0 0 100%;
-        justify-content: center;
-        margin-bottom: 0.5rem;
-    }
-
-    .app-header .col {
-        flex: 0 0 100%;
-        justify-content: center;
-    }
-
-    .main-logo {
-        height: 50px;
-    }
 
     /* Cart summary adjustments */
     .cart-summary {
@@ -436,6 +494,40 @@ header {
     #cart-items {
         max-height: 40vh;
         min-height: 150px;
+    }
+
+    /* Modal Diet: Kasih Ruang Napas */
+    .modal-dialog {
+        width: 92% !important;
+        max-width: 92% !important;
+        margin: 1rem auto !important;
+    }
+
+    .modal-dialog-scrollable .modal-content {
+        max-height: 85vh !important;
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(85vh - 120px) !important;
+    }
+
+    /* Kecilkan Font Admin */
+    #adminModal .table {
+        font-size: 0.8rem !important;
+    }
+
+    #adminModal .card {
+        font-size: 0.8rem !important;
+    }
+
+    #adminModal .fw-bold,
+    #adminModal .fw-semibold {
+        font-size: 0.8rem !important;
+    }
+
+    #adminModal .btn {
+        font-size: 0.8rem !important;
+        padding: 0.35rem 0.7rem !important;
     }
 }
 
@@ -485,389 +577,9 @@ header {
     }
 }
 
-/* ========================================
-   PHONE LANDSCAPE MODE - OPTIMIZED LAYOUT
-   ======================================== */
-/* CRITICAL FIX: Daftar transaksi tidak terlihat karena terhimpit header & footer */
+/* GHOST FRAME REMOVAL - Aggressive Clean Up (Re-applied) */
+@media (max-width: 1024px) and (orientation: landscape) {
 
-@media (max-height: 500px) and (orientation: landscape) {
-
-    /* === HEADER OPTIMIZATION === */
-    /* Kecilkan header agar tidak memakan ruang vertikal */
-    .app-header {
-        padding: 0.2rem 0 !important;
-        min-height: 50px !important;
-    }
-
-    /* Kecilkan logo di landscape */
-    .main-logo {
-        height: 35px !important;
-        max-height: 35px !important;
-    }
-
-    .app-logo {
-        max-height: 35px !important;
-    }
-
-    /* Sembunyikan elemen non-penting di header */
-    .app-header .col-auto>div {
-        display: none !important;
-        /* Hide "Developed by" section */
-    }
-
-    /* Sembunyikan tanggal/waktu di header untuk save space */
-    .app-header #current-date,
-    .app-header #transaction-date {
-        display: none !important;
-    }
-
-    /* Kompakkan spacing header */
-    header .container-fluid {
-        padding-top: 0.25rem !important;
-        padding-bottom: 0.25rem !important;
-    }
-
-    /* === MAIN CONTAINER OPTIMIZATION === */
-    /* Reduce margin top untuk container utama */
-    .container-fluid.mt-3 {
-        margin-top: 0.3rem !important;
-    }
-
-    /* Reduce margin bottom pada cards */
-    .card {
-        margin-bottom: 0.5rem !important;
-    }
-
-    /* === CART ITEMS (DAFTAR TRANSAKSI) === */
-    /* CRITICAL: Set dynamic max-height dengan overflow scroll */
-    #cart-items {
-        max-height: calc(100vh - 280px) !important;
-        /* 280px = header + footer summary + padding */
-        min-height: 120px !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-
-        /* PENTING: Smooth scrolling for touch devices */
-        -webkit-overflow-scrolling: touch !important;
-        scroll-behavior: smooth !important;
-
-        /* Remove padding yang bisa bikin gap */
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 0 !important;
-        /* ← HAPUS padding bottom untuk no gap */
-    }
-
-    /* CRITICAL: Hapus SEMUA margin-bottom pada cart items */
-    .cart-item {
-        padding: 0.4rem 0 !important;
-        margin-bottom: 0 !important;
-        /* ← NO GAP between items */
-        border-bottom: 1px dashed #e9ecef;
-    }
-
-    .cart-item:last-child {
-        border-bottom: none;
-        margin-bottom: 0 !important;
-        padding-bottom: 0.4rem !important;
-    }
-
-    /* Kompakkan item name dan price */
-    .cart-item .item-name {
-        font-size: 0.85rem !important;
-        margin-bottom: 0.15rem !important;
-        line-height: 1.2 !important;
-    }
-
-    .cart-item .item-price {
-        font-size: 0.75rem !important;
-    }
-
-    /* Quantity controls lebih compact */
-    .quantity-control .btn {
-        width: 25px !important;
-        height: 25px !important;
-        font-size: 0.75rem !important;
-        padding: 0 !important;
-    }
-
-    .quantity-control .form-control {
-        width: 40px !important;
-        height: 25px !important;
-        font-size: 0.8rem !important;
-        padding: 0.2rem !important;
-        margin: 0 3px !important;
-    }
-
-    /* === CART SUMMARY (FOOTER) - CSS GRID 3 KOLOM === */
-    /* V3: CSS GRID untuk layout horizontal yang lebih efisien */
-    /* Menghemat ~60px ruang vertikal dengan Grid 3 kolom */
-
-    .cart-summary {
-        padding: 0.3rem 0.5rem !important;
-        margin-top: 0 !important;
-        background: white !important;
-        border-top: 2px solid #dee2e6 !important;
-        display: grid !important;
-        grid-template-columns: 1fr 1fr 1fr !important;
-        /* 3 kolom equal */
-        grid-template-rows: auto auto auto !important;
-        gap: 0.25rem !important;
-        align-items: start !important;
-    }
-
-    /* SUB TOTAL - Grid Cell 1,1 */
-    .cart-summary>div:nth-child(1) {
-        grid-column: 1 / 2 !important;
-        grid-row: 1 / 2 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        font-size: 0.6rem !important;
-        padding: 0.2rem 0.3rem !important;
-        background: #f8f9fa !important;
-        border-radius: 3px !important;
-        margin: 0 !important;
-    }
-
-    /* DISKON - Grid Cell 2,1 */
-    .cart-summary>div:nth-child(2) {
-        grid-column: 2 / 3 !important;
-        grid-row: 1 / 2 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        font-size: 0.6rem !important;
-        padding: 0.2rem 0.3rem !important;
-        background: #fff3cd !important;
-        border-radius: 3px !important;
-        margin: 0 !important;
-    }
-
-    /* PAJAK - Grid Cell 3,1 */
-    .cart-summary>div:nth-child(3) {
-        grid-column: 3 / 4 !important;
-        grid-row: 1 / 2 !important;
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        font-size: 0.6rem !important;
-        padding: 0.2rem 0.3rem !important;
-        background: #d1ecf1 !important;
-        border-radius: 3px !important;
-        margin: 0 !important;
-    }
-
-    /* TOTAL - Grid Cell span 3 kolom, row 2 */
-    .cart-summary>div:nth-child(4) {
-        grid-column: 1 / 4 !important;
-        grid-row: 2 / 3 !important;
-        margin: 0 !important;
-        padding: 0.25rem 0 !important;
-        border-top: 1px solid #dee2e6 !important;
-        font-size: 0.85rem !important;
-        font-weight: 700 !important;
-    }
-
-    /* BUTTONS - Grid Cell span 3 kolom, row 3 */
-    .cart-summary>div:nth-child(5) {
-        grid-column: 1 / 4 !important;
-        grid-row: 3 / 4 !important;
-        margin: 0 !important;
-        padding-top: 0.3rem !important;
-    }
-
-    /* ULTRA COMPACT: Semua span di dalam grid cells */
-    .cart-summary>div:nth-child(1) span,
-    .cart-summary>div:nth-child(2) span,
-    .cart-summary>div:nth-child(3) span {
-        font-size: 0.6rem !important;
-        line-height: 1.1 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: block !important;
-    }
-
-    /* Labels lebih kecil */
-    .cart-summary>div:nth-child(1)>span:first-child,
-    .cart-summary>div:nth-child(2)>div>span:first-child,
-    .cart-summary>div:nth-child(3)>div>span:first-child {
-        font-size: 0.55rem !important;
-        opacity: 0.7 !important;
-        margin-bottom: 0.1rem !important;
-    }
-
-    /* Input fields SUPER KECIL di grid */
-    .cart-summary .form-control-sm {
-        width: 100% !important;
-        max-width: 50px !important;
-        height: 18px !important;
-        font-size: 0.6rem !important;
-        padding: 0.1rem 0.2rem !important;
-        margin: 0.1rem 0 !important;
-        border-radius: 2px !important;
-    }
-
-    /* Nested flex untuk Diskon & Pajak inputs */
-    .cart-summary>div:nth-child(2) .d-flex,
-    .cart-summary>div:nth-child(3) .d-flex {
-        flex-wrap: wrap !important;
-        gap: 0.15rem !important;
-        width: 100% !important;
-    }
-
-    /* Total row styling */
-    .cart-summary .fs-5 {
-        font-size: 0.85rem !important;
-        font-weight: 700 !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-    }
-
-    .cart-summary .fs-5 span {
-        font-size: 0.85rem !important;
-    }
-
-    /* Tombol Proses Pembayaran SUPER COMPACT */
-    .cart-summary .btn-lg {
-        padding: 0.35rem 0.5rem !important;
-        font-size: 0.75rem !important;
-        margin-bottom: 0 !important;
-        line-height: 1.2 !important;
-        width: 100% !important;
-    }
-
-    /* Tombol Clear Cart */
-    #clear-cart-btn {
-        padding: 0.25rem 0.4rem !important;
-        font-size: 0.65rem !important;
-        margin-top: 0.25rem !important;
-        line-height: 1 !important;
-        width: 100% !important;
-    }
-
-    /* CRITICAL: Cart items dengan minimum 150px height */
-    #cart-items {
-        flex-grow: 1 !important;
-        flex-shrink: 1 !important;
-        min-height: 150px !important;
-        /* MINIMUM 150px untuk scroll */
-        max-height: none !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-
-        /* PENTING: Smooth scrolling for touch devices */
-        -webkit-overflow-scrolling: touch !important;
-        scroll-behavior: smooth !important;
-
-        /* HAPUS SEMUA padding/margin berlebih */
-        padding: 0.3rem 0.5rem 0 0.5rem !important;
-        margin: 0 !important;
-    }
-
-    /* HAPUS margin/padding berlebih pada cart-item */
-    .cart-item {
-        padding: 0.3rem 0 !important;
-        margin: 0 !important;
-        /* NO margin! */
-        border-bottom: 1px dashed #e9ecef;
-    }
-
-    .cart-item:last-child {
-        border-bottom: none;
-        margin: 0 !important;
-        padding-bottom: 0.3rem !important;
-    }
-
-    /* Card body harus flex column dengan proper sizing */
-    .transaction-column .card-body.p-0 {
-        display: flex !important;
-        flex-direction: column !important;
-        height: 100% !important;
-        overflow: hidden !important;
-        padding: 0 !important;
-    }
-
-    /* Info mekanik/tanggal lebih compact */
-    .transaction-column .p-2.border-bottom {
-        padding: 0.25rem 0.5rem !important;
-        font-size: 0.65rem !important;
-    }
-
-    .transaction-column .p-2.border-bottom .small {
-        font-size: 0.55rem !important;
-    }
-
-    .transaction-column .p-2.border-bottom>div>div {
-        font-size: 0.65rem !important;
-        line-height: 1.1 !important;
-    }
-
-    /* === PRODUCT CARDS === */
-    /* Smaller product cards in landscape */
-    .product-card .card-img-top {
-        height: 65px !important;
-    }
-
-    .product-card .card-body {
-        padding: 0.35rem !important;
-    }
-
-    .product-card .card-title {
-        font-size: 0.7rem !important;
-        height: 28px !important;
-        line-height: 1.2 !important;
-        margin-bottom: 0.2rem !important;
-    }
-
-    .product-card .card-text {
-        font-size: 0.75rem !important;
-    }
-
-    .product-card small {
-        font-size: 0.65rem !important;
-    }
-
-    /* === ADDITIONAL OPTIMIZATIONS === */
-    /* Reduce padding di kolom-kolom utama */
-    .transaction-column>.card {
-        padding: 0 !important;
-    }
-
-    .transaction-column .card-header {
-        padding: 0.4rem 0.8rem !important;
-        font-size: 0.9rem !important;
-    }
-
-    .transaction-column .card-body {
-        padding: 0 !important;
-    }
-
-    /* Empty cart message juga compact */
-    #cart-items .text-center {
-        padding: 1rem !important;
-        font-size: 0.85rem !important;
-    }
-
-    /* Smooth scrollbar di cart items */
-    #cart-items::-webkit-scrollbar {
-        width: 5px !important;
-    }
-
-    #cart-items::-webkit-scrollbar-thumb {
-        background: #aaa !important;
-        border-radius: 10px !important;
-    }
-
-    #cart-items::-webkit-scrollbar-track {
-        background: #f1f1f1 !important;
-    }
-
-    /* CRITICAL: Hilangkan Ghost Container (Frame Putih) secara Agresif */
-    .product-column,
-    .transaction-column,
     .product-column .card,
     .transaction-column .card,
     .col-md-8,
@@ -877,12 +589,32 @@ header {
         box-shadow: none !important;
     }
 
-    /* Hilangkan margin atas container utama */
-    .container-fluid.mt-3 {
-        margin-top: 0 !important;
-        padding-top: 5px !important;
+    .product-column {
+        padding-right: 0 !important;
+        padding-left: 0 !important;
+    }
+
+    .transaction-column {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Remove padding from container to be truly flush */
+    .container-fluid.main-pos-container {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .container-fluid.main-pos-container>.row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
 }
+
+/* ========================================
+   PHONE LANDSCAPE MODE - OPTIMIZED LAYOUT
+   ======================================== */
+
 
 .form-check-input:checked {
     background-color: #dc3545;
@@ -933,6 +665,35 @@ header {
     border-width: 0.2em;
 }
 
+/* ========================================
+   MODAL FIX: PREVENT TENGGELAM (CUT-OFF)
+   ======================================== */
+
+/* Ensure modal never exceeds viewport height */
+.modal-content {
+    max-height: 90vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Only modal body scrolls, header and footer stay fixed */
+.modal-body {
+    overflow-y: auto !important;
+    flex: 1 1 auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Modal header stays at top */
+.modal-header {
+    flex-shrink: 0 !important;
+}
+
+/* Modal footer stays at bottom */
+.modal-footer {
+    flex-shrink: 0 !important;
+}
+
 /* Styling logo agar besar dan memenuhi header */
 .main-logo {
     height: 65px;
@@ -962,6 +723,19 @@ header .container-fluid .row {
 
     .modal-dialog-scrollable .modal-body {
         max-height: 70vh;
+    }
+}
+
+/* ADMIN MODAL FIX: Tablet Portrait (agar tidak kepotong) */
+@media (max-width: 1024px) and (orientation: portrait) {
+    .modal-dialog-scrollable .modal-content {
+        max-height: 90vh !important;
+        overflow: hidden;
+    }
+
+    .modal-dialog-scrollable .modal-body {
+        max-height: calc(90vh - 120px) !important;
+        /* Header + Footer height approx 120px */
     }
 }
 
