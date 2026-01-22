@@ -865,9 +865,13 @@ header {
         background: #f1f1f1 !important;
     }
 
-    /* CRITICAL: Hilangkan Ghost Container (Frame Putih) */
+    /* CRITICAL: Hilangkan Ghost Container (Frame Putih) secara Agresif */
+    .product-column,
+    .transaction-column,
     .product-column .card,
-    .transaction-column>.card {
+    .transaction-column .card,
+    .col-md-8,
+    .col-md-4 {
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
@@ -1124,18 +1128,61 @@ header .container-fluid .row {
 }
 
 /* ========================================
-   GLOBAL UI/UX REFINEMENTS
+   BRAND LIST PREMIUM STYLING
    ======================================== */
 
-/* Smooth Transition for Menu Switching */
+/* Smooth Transition for Menu Switching (Global) */
 .product-card,
 .container-fluid {
     transition: all 0.3s ease-in-out;
 }
 
-/* Ensure Logo in Brand List is never cropped */
+/* 1. Uniform Brand Box & Premium Shadow */
+.product-card[data-brand] {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    /* Premium Shadow */
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 2. Hover Effect: Lift & Deep Shadow */
+.product-card[data-brand]:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    z-index: 5;
+}
+
+/* 3. DOMINANT IMAGE: Cover & Zero Padding */
 .product-card[data-brand] .card-img-top {
-    object-fit: contain !important;
-    padding: 10px;
-    background-color: #fff;
+    height: 120px !important;
+    width: 100%;
+    object-fit: cover !important;
+    /* MELEDAK memenuhi kotak */
+    padding: 0 !important;
+    /* HILANGKAN padding */
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* 4. Compact & Bold Brand Text */
+.product-card[data-brand] .card-body {
+    background-color: #f8f9fa !important;
+    padding: 0.6rem !important;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-card[data-brand] .card-title {
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    color: #343a40;
+    margin: 0 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
