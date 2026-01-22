@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v26'; // v3.3.4 - POLISH: Professional placeholders & brand list improvements
+const CACHE_NAME = 'dewa-ban-v27'; // v3.3.5 - FINAL: Ghost container fix & global safety net
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

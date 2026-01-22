@@ -864,6 +864,20 @@ header {
     #cart-items::-webkit-scrollbar-track {
         background: #f1f1f1 !important;
     }
+
+    /* CRITICAL: Hilangkan Ghost Container (Frame Putih) */
+    .product-column .card,
+    .transaction-column>.card {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Hilangkan margin atas container utama */
+    .container-fluid.mt-3 {
+        margin-top: 0 !important;
+        padding-top: 5px !important;
+    }
 }
 
 .form-check-input:checked {
@@ -1107,4 +1121,21 @@ header .container-fluid .row {
     .upload-box {
         margin-bottom: 10px;
     }
+}
+
+/* ========================================
+   GLOBAL UI/UX REFINEMENTS
+   ======================================== */
+
+/* Smooth Transition for Menu Switching */
+.product-card,
+.container-fluid {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Ensure Logo in Brand List is never cropped */
+.product-card[data-brand] .card-img-top {
+    object-fit: contain !important;
+    padding: 10px;
+    background-color: #fff;
 }

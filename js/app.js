@@ -1471,9 +1471,10 @@ function renderBrandList() {
         const col = document.createElement('div');
         col.className = 'col-6 col-md-4 col-lg-3 mb-3';
 
-        // PRIORITIZED: Cloudinary URL from database (Link Internet)
-        // Logika: Cari produk dari brand ini yang punya field logo berupa URL
+        // PRIORITIZED: Aggressively search for Cloudinary URL in ALL products of this brand
+        // Logika: Scan seluruh database (find) untuk menemukan satu produk dari brand ini yang punya logo URL valid
         const internetLogo = products.find(p =>
+            p.brand &&
             p.brand.toUpperCase() === brand.toUpperCase() &&
             p.logo &&
             p.logo.startsWith('http')
