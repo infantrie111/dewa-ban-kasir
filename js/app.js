@@ -390,10 +390,10 @@ const adminDailyItemsEl = document.getElementById('admin-daily-items');
 const adminDailyProfitEl = document.getElementById('admin-daily-profit');
 const brandDatalist = document.getElementById('brand-list');
 const newBrandEl = document.getElementById('new-brand');
-const newNameEl = document.getElementById('new-name');
-const newPriceEl = document.getElementById('new-price');
-const newCostPriceEl = document.getElementById('new-cost-price');
-const newStockEl = document.getElementById('new-stock');
+const newNameEl = document.getElementById('new-product-name'); // Updated ID
+const newPriceEl = document.getElementById('new-product-price'); // Updated ID
+const newCostPriceEl = document.getElementById('new-product-cost'); // Updated ID
+const newStockEl = document.getElementById('new-product-stock'); // Updated ID
 const newImageEl = document.getElementById('new-image');
 const saveNewProductBtn = document.getElementById('save-new-product');
 const clearCartBtn = document.getElementById('clear-cart-btn');
@@ -402,6 +402,13 @@ const adminHistoryTbody = document.getElementById('admin-history-tbody');
 const adminHistoryTabBtn = document.getElementById('history-tab');
 const analyticsTabBtn = document.getElementById('analytics-tab');
 const refreshAnalyticsBtn = document.getElementById('refresh-analytics-btn');
+
+// Brand dropdown & logo elements
+const newBrandNameContainer = document.getElementById('new-brand-name-container');
+const newBrandNameInput = document.getElementById('new-brand-name-input');
+const brandLogoContainer = document.getElementById('brand-logo-container');
+const brandLogoInput = document.getElementById('brand-logo-input');
+const brandLogoPreview = document.getElementById('brand-logo-preview');
 
 // Save cart to localStorage
 function saveCart() {
@@ -1890,18 +1897,93 @@ function resetUploadUI() {
     if (imagePreview) imagePreview.src = 'img/logo.png';
 }
 
+// ========================================
+// BRAND DROPDOWN & LOGO FUNCTIONS
+// ========================================
+
+// Get unique brands from products
+function getUniqueBrands() {
+    const brandsSet = new Set();
+    products.forEach(p => {
+        if (p.brand && p.brand.trim() !== '') {
+            brandsSet.add(p.brand.toUpperCase());
+        }
+    });
+    return Array.from(brandsSet).sort();
+}
+
+// Get logo URL for a specific brand (from existing products)
+function getBrandLogoUrl(brandName) {
+    const brandUpper = brandName.toUpperCase();
+    const productWithLogo = products.find(p => p.brand.toUpperCase() === brandUpper && p.logo);
+    return productWithLogo?.logo || 'img/logo.png'; // Fallback to default if not found
+}
+
+// Populate brand dropdown with existing brands
+function populateBrandDropdown() {
+    if (!newBrandEl) return;
+
+    const uniqueBrands = getUniqueBrands();
+
+    // Clear existing options except first and last (-- Pilih -- and + TAMBAH BRAND BARU)
+    while (newBrandEl.options.length > 2) {
+        newBrandEl.remove(1); // Remove from index 1 (after "-- Pilih --")
+    }
+
+    // Add existing brands
+    uniqueBrands.forEach(brand => {
+        const option = document.createElement('option');
+        option.value = brand;
+        option.textContent = brand;
+        // Insert before the last option (+ TAMBAH BRAND BARU)
+        newBrandEl.insertBefore(option, newBrandEl.lastElementChild);
+    });
+
+    console.log('✅ Brand dropdown populated:', uniqueBrands.length, 'brands');
+}
+
+// Toggle brand logo input visibility based on dropdown selection
+function toggleBrandLogoInput() {
+    const selectedValue = newBrandEl?.value;
+
+    if (selectedValue === '__NEW_BRAND__') {
+        // Show input for new brand name and logo
+        if (newBrandNameContainer) newBrandNameContainer.style.display = 'block';
+        if (brandLogoContainer) brandLogoContainer.style.display = 'block';
+    } else {
+        // Hide inputs
+        if (newBrandNameContainer) newBrandNameContainer.style.display = 'none';
+        if (brandLogoContainer) brandLogoContainer.style.display = 'none';
+
+        // Reset inputs
+        if (newBrandNameInput) newBrandNameInput.value = '';
+        if (brandLogoInput) brandLogoInput.value = '';
+        if (brandLogoPreview) brandLogoPreview.src = 'img/logo.png';
+    }
+}
+
 async function addNewProductFromForm() {
-    const brandRaw = (newBrandEl?.value || '').trim();
+    // Get brand selection
+    const brandSelection = newBrandEl?.value?.trim() || '';
+    const isNewBrand = brandSelection === '__NEW_BRAND__';
+
+    // Determine actual brand name
+    let brand = '';
+    if (isNewBrand) {
+        brand = (newBrandNameInput?.value || '').trim().toUpperCase();
+    } else {
+        brand = brandSelection;
+    }
+
     const name = (newNameEl?.value || '').trim();
-    const brand = brandRaw.toUpperCase();
     const price = Number(newPriceEl?.value) || 0;
     const costRaw = (newCostPriceEl?.value ?? '').toString();
     const costPrice = costRaw.trim().length === 0 ? NaN : Number(costRaw);
     const stock = Math.max(0, Number(newStockEl?.value) || 0);
 
-    // Get file from file input
-    const fileInput = newImageEl;
-    const file = fileInput?.files?.[0];
+    // Get files from file inputs
+    const productImageFile = newImageEl?.files?.[0];
+    const brandLogoFile = brandLogoInput?.files?.[0];
 
     // Validation
     if (!isAuthenticated || !currentUser) {
@@ -1909,7 +1991,11 @@ async function addNewProductFromForm() {
         return;
     }
     if (!brand) {
-        showAlert('Brand wajib diisi', 'warning');
+        showAlert(isNewBrand ? 'Nama brand baru wajib diisi' : 'Brand wajib dipilih', 'warning');
+        return;
+    }
+    if (isNewBrand && !brandLogoFile) {
+        showAlert('Logo brand baru wajib diupload', 'warning');
         return;
     }
     if (!name) {
@@ -1934,22 +2020,48 @@ async function addNewProductFromForm() {
 
     try {
         const productId = getNextProductId();
-        let imageUrl = 'img/logo.png'; // Default fallback
+        let productImageUrl = 'img/logo.png'; // Default fallback for product
+        let brandLogoUrl = '';
 
-        // Upload image if file is selected
-        if (file) {
+        // STEP 1: Upload brand logo if new brand
+        if (isNewBrand && brandLogoFile) {
             try {
-                // Compress image before upload
-                const compressedFile = await compressImage(file);
-                imageUrl = await uploadImageToStorage(compressedFile, productId);
+                console.log('📤 Uploading brand logo for new brand:', brand);
+                const compressedLogo = await compressImage(brandLogoFile);
+                brandLogoUrl = await uploadImageToStorage(compressedLogo, `brand_${brand.toLowerCase()}`);
+                console.log('✅ Brand logo uploaded:', brandLogoUrl);
+            } catch (logoError) {
+                console.error('Brand logo upload failed:', logoError);
+                showAlert('Gagal mengupload logo brand: ' + logoError.message, 'danger');
+                // Reset button
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Simpan Produk Baru';
+                }
+                return; // Stop if logo upload fails for new brand
+            }
+        } else {
+            // Use existing brand logo
+            brandLogoUrl = getBrandLogoUrl(brand);
+            console.log('📋 Using existing logo for brand:', brand, '→', brandLogoUrl);
+        }
+
+        // STEP 2: Upload product image if file is selected
+        if (productImageFile) {
+            try {
+                console.log('📤 Uploading product image...');
+                const compressedFile = await compressImage(productImageFile);
+                productImageUrl = await uploadImageToStorage(compressedFile, productId);
+                console.log('✅ Product image uploaded:', productImageUrl);
             } catch (uploadError) {
-                console.error('Image upload failed:', uploadError);
-                showAlert('Gagal mengupload gambar: ' + uploadError.message, 'danger');
+                console.error('Product image upload failed:', uploadError);
+                showAlert('Gagal mengupload gambar produk: ' + uploadError.message, 'danger');
                 // Continue with default image
-                imageUrl = 'img/logo.png';
+                productImageUrl = 'img/logo.png';
             }
         }
 
+        // STEP 3: Create product object with logo
         const newProduct = normalizeProduct({
             id: productId,
             brand,
@@ -1957,24 +2069,31 @@ async function addNewProductFromForm() {
             price,
             costPrice,
             stock,
-            image: imageUrl
+            image: productImageUrl,
+            logo: brandLogoUrl  // ← NEW: Logo URL for brand
         });
 
         products.push(newProduct);
         saveProducts();
         refreshCurrentProductView();
         refreshAdminModal();
+        populateBrandDropdown(); // ← Refresh dropdown after adding
 
         // Reset form
         if (newBrandEl) newBrandEl.value = '';
+        if (newBrandNameInput) newBrandNameInput.value = '';
         if (newNameEl) newNameEl.value = '';
         if (newPriceEl) newPriceEl.value = '';
         if (newCostPriceEl) newCostPriceEl.value = '';
         if (newStockEl) newStockEl.value = '0';
         if (newImageEl) newImageEl.value = '';
+        if (brandLogoInput) brandLogoInput.value = '';
         resetUploadUI();
 
-        showAlert('Produk baru berhasil ditambahkan', 'success');
+        // Reset brand logo preview
+        if (brandLogoPreview) brandLogoPreview.src = 'img/logo.png';
+
+        showAlert(`Produk ${name} berhasil ditambahkan!`, 'success');
     } catch (error) {
         console.error('Error adding product:', error);
         showAlert('Gagal menambahkan produk: ' + error.message, 'danger');
@@ -2453,3 +2572,56 @@ function showAlert(message, type = 'info') {
 function formatNumber(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
+
+// ========================================
+// EVENT LISTENERS - BRAND DROPDOWN
+// ========================================
+
+// Brand dropdown change event
+if (newBrandEl) {
+    newBrandEl.addEventListener('change', toggleBrandLogoInput);
+}
+
+// Brand logo file input change event (preview)
+if (brandLogoInput) {
+    brandLogoInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && brandLogoPreview) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showAlert('File harus berupa gambar', 'warning');
+                e.target.value = '';
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert('Ukuran gambar maksimal 5MB', 'warning');
+                e.target.value = '';
+                return;
+            }
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                brandLogoPreview.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        } else if (brandLogoPreview) {
+            brandLogoPreview.src = 'img/logo.png';
+        }
+    });
+}
+
+// Populate brand dropdown on auth state change
+const originalOnAuthStateChanged = auth.onAuthStateChanged;
+auth.onAuthStateChanged((user) => {
+    // Original auth state logic exists elsewhere in the code
+    // We just need to populate dropdown after products are loaded
+    if (user) {
+        // Wait a bit for products to load
+        setTimeout(() => {
+            populateBrandDropdown();
+        }, 500);
+    }
+});

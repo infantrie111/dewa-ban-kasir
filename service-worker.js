@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v15'; // v3.1.0 - Migration: Firebase Storage → Cloudinary
+const CACHE_NAME = 'dewa-ban-v18'; // v3.2.2 - CRITICAL FIX: Restore Missing Inputs & Layout Finalization
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

@@ -337,49 +337,100 @@
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label for="new-brand" class="form-label">Brand</label>
-                                    <input type="text" class="form-control" id="new-brand" list="brand-list" />
-                                    <datalist id="brand-list"></datalist>
+                                    <select class="form-select" id="new-brand">
+                                        <option value="">-- Pilih Brand --</option>
+                                        <!-- Brands will be populated by JavaScript -->
+                                        <option value="__NEW_BRAND__">+ TAMBAH BRAND BARU</option>
+                                    </select>
                                 </div>
-                                <div class="col-md-8">
-                                    <label for="new-name" class="form-label">Product Name</label>
-                                    <input type="text" class="form-control" id="new-name" />
+
+                                <!-- Input Nama Brand Baru (hidden by default) -->
+                                <div class="col-md-4" id="new-brand-name-container" style="display: none;">
+                                    <label for="new-brand-name-input" class="form-label">Nama Brand Baru</label>
+                                    <input type="text" class="form-control" id="new-brand-name-input"
+                                        placeholder="Contoh: MICHELIN" />
                                 </div>
+
                                 <div class="col-md-4">
-                                    <label for="new-price" class="form-label">Price</label>
-                                    <input type="number" class="form-control" id="new-price" min="0" />
+                                    <label for="new-product-name" class="form-label">Nama Produk</label>
+                                    <input type="text" class="form-control" id="new-product-name"
+                                        placeholder="Contoh: Pilot Sport 4" />
                                 </div>
-                                <div class="col-md-4">
-                                    <label for="new-cost-price" class="form-label">Harga Modal / Beli</label>
-                                    <input type="number" class="form-control" id="new-cost-price" min="0" />
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="new-stock" class="form-label">Stock</label>
-                                    <input type="number" class="form-control" id="new-stock" min="0" value="0" />
-                                </div>
-                                <div class="col-md-12">
-                                    <label for="new-image" class="form-label">Foto Produk</label>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div id="image-preview-container"
-                                            class="border rounded d-flex align-items-center justify-content-center"
-                                            style="width: 100px; height: 100px; overflow: hidden; background: #f8f9fa;">
-                                            <img id="image-preview" src="img/logo.png" alt="Preview"
-                                                style="max-width: 100%; max-height: 100%; object-fit: contain;">
-                                        </div>
-                                        <div class="flex-grow-1">
-                                            <input type="file" class="form-control" id="new-image" accept="image/*" />
-                                            <small class="text-muted d-block mt-1">
-                                                <i class="bi bi-camera me-1"></i>Pilih dari galeri atau ambil foto baru
-                                            </small>
-                                            <div id="upload-progress" class="progress mt-2 d-none" style="height: 8px;">
-                                                <div class="progress-bar bg-danger" role="progressbar"
-                                                    style="width: 0%"></div>
+
+
+                                <!-- Upload Section: Side-by-Side (Logo Brand & Foto Produk) -->
+                                <div class="col-12">
+                                    <div class="row g-3 upload-section-row">
+                                        <!-- LEFT: Logo Brand Baru (hidden by default) -->
+                                        <div class="col-md-6" id="brand-logo-container" style="display: none;">
+                                            <div class="upload-box">
+                                                <label for="brand-logo-input" class="form-label fw-semibold">
+                                                    <i class="bi bi-badge-tm me-1 text-danger"></i>Logo Brand Baru
+                                                </label>
+                                                <div class="d-flex align-items-start gap-2">
+                                                    <div class="preview-container">
+                                                        <img id="brand-logo-preview" src="img/logo.png"
+                                                            alt="Logo Preview" />
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <input type="file" class="form-control form-control-sm"
+                                                            id="brand-logo-input" accept="image/*" />
+                                                        <small class="text-muted d-block mt-1">
+                                                            <i class="bi bi-info-circle me-1"></i>Logo untuk menu utama
+                                                        </small>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <small id="upload-status" class="text-muted d-none"></small>
+                                        </div>
+
+                                        <!-- RIGHT: Foto Produk -->
+                                        <div class="col-md-6 product-image-column">
+                                            <div class="upload-box">
+                                                <label for="new-image" class="form-label fw-semibold">
+                                                    <i class="bi bi-image me-1 text-danger"></i>Foto Produk
+                                                </label>
+                                                <div class="d-flex align-items-start gap-2">
+                                                    <div class="preview-container">
+                                                        <img id="image-preview" src="img/logo.png"
+                                                            alt="Product Preview" />
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <input type="file" class="form-control form-control-sm"
+                                                            id="new-image" accept="image/*" />
+                                                        <small class="text-muted d-block mt-1">
+                                                            <i class="bi bi-camera me-1"></i>Galeri atau kamera
+                                                        </small>
+                                                        <div id="upload-progress" class="progress mt-2 d-none"
+                                                            style="height: 6px;">
+                                                            <div class="progress-bar bg-danger" role="progressbar"
+                                                                style="width: 0%"></div>
+                                                        </div>
+                                                        <small id="upload-status" class="text-muted d-none"></small>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-12">
-                                    <button type="button" class="btn btn-danger" id="save-new-product">
+
+                                <!-- Row 3: Prices & Stock (3 Column) -->
+                                <div class="col-md-4">
+                                    <label for="new-product-cost" class="form-label">Harga Modal / Beli</label>
+                                    <input type="number" class="form-control" id="new-product-cost" min="0" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="new-product-price" class="form-label">Harga Jual</label>
+                                    <input type="number" class="form-control" id="new-product-price" min="0" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="new-product-stock" class="form-label">Stock Awal</label>
+                                    <input type="number" class="form-control" id="new-product-stock" min="0"
+                                        value="0" />
+                                </div>
+
+                                <div class="col-12 pt-2">
+                                    <button type="button" class="btn btn-danger w-100 py-2 fw-bold"
+                                        id="save-new-product">
                                         <i class="bi bi-save me-2"></i>Simpan Produk Baru
                                     </button>
                                 </div>
