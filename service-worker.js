@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v41.1-final'; // v41.1 - Force Update & Fix Logo
+const CACHE_NAME = 'dewa-ban-v43.1-fix-png'; // v43.1 - Fix PNG Logo
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,7 +7,7 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './img/logo.png',
   './img/jasa.png',
-  './img/logoapkkk.jpeg'
+  './img/logoapkbaru.png'
 ];
 
 self.addEventListener('install', (event) => {
