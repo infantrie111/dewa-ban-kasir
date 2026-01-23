@@ -1638,12 +1638,8 @@ function refreshAdminModal() {
                 <div class="fw-semibold">${p.name}</div>
                 <div class="small text-muted">${p.brand}</div>
             </td>
-            <td>
-                <div class="input-group input-group-sm">
-                    <button class="btn btn-outline-secondary" type="button" data-action="dec" data-id="${p.id}">-</button>
-                    <input type="number" class="form-control" min="0" value="${p.stock}" data-action="set" data-id="${p.id}">
-                    <button class="btn btn-outline-secondary" type="button" data-action="inc" data-id="${p.id}">+</button>
-                </div>
+            <td class="text-center">
+                <input type="number" class="form-control form-control-sm" style="width: 80px; margin: 0 auto; text-align: center;" min="0" value="${p.stock}" data-action="set" data-id="${p.id}">
             </td>
             <td>
                 <input type="number" class="form-control form-control-sm" min="0" value="${p.costPrice}" data-action="costPrice" data-id="${p.id}">

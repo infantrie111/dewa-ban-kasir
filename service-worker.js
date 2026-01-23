@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v34'; // v34 - RADIKAL: Modal Tenggelam Fix + Cart Text Visibility
+const CACHE_NAME = 'dewa-ban-v36.2'; // v36.2 - Natural Scroll HP Landscape
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

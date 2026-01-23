@@ -304,11 +304,13 @@ header {
 }
 
 /* ========================================
-   RESPONSIVE LAYOUT - MOBILE/TABLET
+   RESPONSIVE LAYOUT - DEVICE HIERARCHY
    ======================================== */
 
-/* Tablet Portrait & Mobile Landscape: Stack vertically */
-@media (max-width: 767px) {
+/* ==========================================
+   HP ONLY (< 992px): VERTICAL STACKING
+   ========================================== */
+@media (max-width: 991px) {
 
     /* Disable independent scroll on mobile - use normal flow */
     .main-pos-container {
@@ -331,7 +333,7 @@ header {
         overflow: visible;
     }
 
-    /* Force main columns to stack */
+    /* Force main columns to stack vertically */
     .container-fluid>.row>.col-md-8,
     .container-fluid>.row>.col-md-4 {
         flex: 0 0 100%;
@@ -339,7 +341,7 @@ header {
         width: 100%;
     }
 
-    /* Give product area full height before transaction */
+    /* Product area first (top) */
     .container-fluid>.row>.col-md-8 {
         order: 1;
         margin-bottom: 1rem;
@@ -350,10 +352,12 @@ header {
         order: 2;
     }
 
-    /* Adjust cart height for stacked layout */
+    /* CRITICAL: Cart height control for HP */
     #cart-items {
-        max-height: 50vh;
-        min-height: 200px;
+        max-height: 180px !important;
+        min-height: 100px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden;
         flex: none;
     }
 
@@ -363,6 +367,34 @@ header {
     #product-list>.col-lg-3 {
         flex: 0 0 50%;
         max-width: 50%;
+    }
+}
+
+/* ==========================================
+   TABLET/PC (≥ 992px): SIDE-BY-SIDE LAYOUT
+   ========================================== */
+@media (min-width: 992px) {
+
+    /* Maintain horizontal layout */
+    .container-fluid>.row {
+        display: flex;
+        flex-wrap: nowrap;
+    }
+
+    .product-column {
+        flex: 0 0 66.666667%;
+        max-width: 66.666667%;
+    }
+
+    .transaction-column {
+        flex: 0 0 33.333333%;
+        max-width: 33.333333%;
+    }
+
+    /* Cart can expand on larger screens */
+    #cart-items {
+        max-height: none;
+        overflow-y: auto;
     }
 }
 
@@ -610,6 +642,64 @@ header {
         margin-right: 0 !important;
     }
 }
+
+/* ========================================
+   HP LANDSCAPE FIX: FORCE VERTICAL LAYOUT
+   ======================================== */
+
+/* Enforce vertical stacking on ALL devices under 992px, even in landscape */
+@media (max-width: 991px) {
+    .main-pos-container>.row {
+        flex-direction: column !important;
+        flex-wrap: wrap !important;
+    }
+
+    .product-column,
+    .transaction-column {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+}
+
+/* Specific fix for Mobile Landscape: DISABLE INDEPENDENT SCROLL */
+@media (max-height: 580px) and (orientation: landscape) and (max-width: 991px) {
+
+    /* Disable all fixed heights and independent scrolls */
+    .main-pos-container,
+    .transaction-column,
+    .transaction-column>.card,
+    #cart-items {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        flex: none !important;
+    }
+
+    /* Summary sticks naturally to bottom of content, not screen */
+    .cart-summary {
+        position: relative !important;
+        bottom: auto !important;
+        border-top: 1px dashed #dee2e6;
+    }
+
+    /* Compact styling for landscape */
+    .cart-item {
+        padding: 5px 0 !important;
+    }
+
+    .cart-item .item-name {
+        font-size: 0.85rem !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* Ensure transaction column has space from products */
+    .transaction-column {
+        margin-top: 1rem !important;
+    }
+}
+
 
 /* ========================================
    PHONE LANDSCAPE MODE - OPTIMIZED LAYOUT

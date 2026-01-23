@@ -275,39 +275,6 @@
                     <div class="tab-content pt-3" id="adminTabsContent">
                         <div class="tab-pane fade show active" id="stock-tab-pane" role="tabpanel"
                             aria-labelledby="stock-tab" tabindex="0">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="fw-semibold">Ringkasan Penjualan Hari Ini</div>
-                                <button type="button" class="btn btn-sm btn-outline-danger" id="admin-daily-refresh">
-                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                                </button>
-                            </div>
-                            <div id="admin-daily-empty" class="text-muted mb-3">Belum ada transaksi hari ini.</div>
-                            <div id="admin-daily-cards" class="row g-2 mb-3 d-none">
-                                <div class="col-12 col-md-3">
-                                    <div class="p-3 rounded bg-danger text-white h-100">
-                                        <div class="small opacity-75">Total Omzet</div>
-                                        <div class="fw-bold fs-6" id="admin-daily-omzet">Rp 0</div>
-                                    </div>
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <div class="p-3 rounded bg-dark text-white h-100">
-                                        <div class="small opacity-75">Jumlah Transaksi</div>
-                                        <div class="fw-bold fs-6" id="admin-daily-transactions">0</div>
-                                    </div>
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <div class="p-3 rounded bg-white border h-100">
-                                        <div class="small text-muted">Produk Terjual</div>
-                                        <div class="fw-bold fs-6 text-danger" id="admin-daily-items">0 pcs</div>
-                                    </div>
-                                </div>
-                                <div class="col-12 col-md-3">
-                                    <div class="p-3 rounded bg-success text-white h-100">
-                                        <div class="small opacity-75">Total Laba Hari Ini</div>
-                                        <div class="fw-bold fs-6" id="admin-daily-profit">Rp 0</div>
-                                    </div>
-                                </div>
-                            </div>
                             <div class="input-group mb-3">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                                 <input type="text" class="form-control" id="admin-stock-search"
@@ -454,6 +421,41 @@
                         <!-- Tab Analisis Bisnis -->
                         <div class="tab-pane fade" id="analytics-tab-pane" role="tabpanel"
                             aria-labelledby="analytics-tab" tabindex="0">
+
+                            <!-- Ringkasan Penjualan Hari Ini -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="fw-semibold">Ringkasan Penjualan Hari Ini</div>
+                                <button type="button" class="btn btn-sm btn-outline-danger" id="admin-daily-refresh">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                            </div>
+                            <div id="admin-daily-empty" class="text-muted mb-3">Belum ada transaksi hari ini.</div>
+                            <div id="admin-daily-cards" class="row g-2 mb-4 d-none">
+                                <div class="col-12 col-md-3">
+                                    <div class="p-3 rounded bg-danger text-white h-100">
+                                        <div class="small opacity-75">Total Omzet</div>
+                                        <div class="fw-bold fs-6" id="admin-daily-omzet">Rp 0</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="p-3 rounded bg-dark text-white h-100">
+                                        <div class="small opacity-75">Jumlah Transaksi</div>
+                                        <div class="fw-bold fs-6" id="admin-daily-transactions">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="p-3 rounded bg-white border h-100">
+                                        <div class="small text-muted">Produk Terjual</div>
+                                        <div class="fw-bold fs-6 text-danger" id="admin-daily-items">0 pcs</div>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="p-3 rounded bg-success text-white h-100">
+                                        <div class="small opacity-75">Total Laba Hari Ini</div>
+                                        <div class="fw-bold fs-6" id="admin-daily-profit">Rp 0</div>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Kontainer Flex untuk Layout Bersebelahan -->
                             <div class="analytics-container">
