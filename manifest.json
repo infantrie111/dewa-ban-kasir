@@ -1,7 +1,7 @@
 {
   "name": "DEWA BAN",
   "short_name": "DEWA BAN",
-  "start_url": ".",
+  "start_url": "./index.html?launcher=true",
   "scope": ".",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -10,14 +10,12 @@
     {
       "src": "img/logoapkkk.jpeg",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     },
     {
       "src": "img/logoapkkk.jpeg",
       "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     }
   ]
 }

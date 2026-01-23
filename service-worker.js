@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v40.1'; // v40.1 - New PWA Logo (logoapkkk.jpeg)
+const CACHE_NAME = 'dewa-ban-v41.1-final'; // v41.1 - Force Update & Fix Logo
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -11,10 +11,11 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Force the waiting service worker to become the active service worker.
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -27,6 +28,7 @@ self.addEventListener('activate', (event) => {
       )
     )
   );
+  // Tell the active service worker to take control of the page immediately.
   self.clients.claim();
 });
 
