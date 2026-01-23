@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v36.2'; // v36.2 - Natural Scroll HP Landscape
+const CACHE_NAME = 'dewa-ban-v38'; // v38 - New PWA Installation Logo
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

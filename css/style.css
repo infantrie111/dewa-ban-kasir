@@ -1050,3 +1050,177 @@ header .container-fluid .row {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+
+/* ========================================
+   MANAGE STOCK - MOBILE CARD LAYOUT
+   ======================================== */
+
+/* Mobile Portrait Mode - Card Layout untuk Manage Stock */
+@media (max-width: 576px) {
+
+    /* Hide table header di mobile */
+    #stock-tab-pane thead {
+        display: none !important;
+    }
+
+    /* Transform table rows menjadi cards */
+    #admin-stock-tbody tr {
+        display: block !important;
+        margin-bottom: 15px !important;
+        padding: 0 !important;
+        /* Remove padding, akan ada di masing-masing td */
+        border: 1px solid #ddd !important;
+        border-radius: 8px !important;
+        background-color: #fff !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        /* Agar background tidak keluar */
+    }
+
+    /* Sembunyikan default border table */
+    #admin-stock-tbody tr td {
+        display: block !important;
+        border: none !important;
+        padding: 0 !important;
+        text-align: left !important;
+    }
+
+    /* Nama Produk - dengan Background Abu-abu (#f8f9fa) */
+    #admin-stock-tbody tr td:nth-child(1) {
+        width: 100% !important;
+        margin-bottom: 0 !important;
+        padding: 12px 50px 12px 15px !important;
+        /* Top Right Bottom Left */
+        background-color: #f8f9fa !important;
+        /* Background abu-abu muda */
+        border-bottom: 1px solid #dee2e6 !important;
+        /* Garis pemisah */
+    }
+
+    #admin-stock-tbody tr td:nth-child(1) .fw-semibold {
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        color: #212529 !important;
+        margin-bottom: 3px !important;
+        display: block !important;
+    }
+
+    #admin-stock-tbody tr td:nth-child(1) .small {
+        font-size: 0.75rem !important;
+        color: #6c757d !important;
+    }
+
+    /* Container untuk Input Fields (2 Kolom Grid) */
+    #admin-stock-tbody tr td:nth-child(2),
+    #admin-stock-tbody tr td:nth-child(3),
+    #admin-stock-tbody tr td:nth-child(4) {
+        width: 50% !important;
+        float: left !important;
+        padding: 10px !important;
+        /* Padding lebih besar untuk spacing */
+        box-sizing: border-box !important;
+    }
+
+    /* Tambahkan Label dengan CSS ::before */
+    #admin-stock-tbody tr td:nth-child(2)::before {
+        content: 'Stok:' !important;
+        display: block !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+        margin-bottom: 4px !important;
+    }
+
+    #admin-stock-tbody tr td:nth-child(3)::before {
+        content: 'Modal:' !important;
+        display: block !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+        margin-bottom: 4px !important;
+    }
+
+    #admin-stock-tbody tr td:nth-child(4)::before {
+        content: 'Jual:' !important;
+        display: block !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        color: #495057 !important;
+        margin-bottom: 4px !important;
+    }
+
+    /* Input Fields Styling */
+    #admin-stock-tbody tr td input.form-control {
+        width: 100% !important;
+        font-size: 0.85rem !important;
+        padding: 8px 10px !important;
+        /* Padding lebih nyaman */
+        text-align: left !important;
+        margin: 0 !important;
+        border: 1px solid #ced4da !important;
+        border-radius: 4px !important;
+    }
+
+    /* Tombol Delete - Posisi Absolut di dalam Header Abu-abu */
+    #admin-stock-tbody tr td:nth-child(5) {
+        position: absolute !important;
+        top: 8px !important;
+        right: 10px !important;
+        width: auto !important;
+        float: none !important;
+        padding: 0 !important;
+    }
+
+    #admin-stock-tbody tr td:nth-child(5) button {
+        padding: 5px 10px !important;
+        font-size: 0.85rem !important;
+    }
+
+    /* Clear float setelah input fields */
+    #admin-stock-tbody tr::after {
+        content: '' !important;
+        display: table !important;
+        clear: both !important;
+    }
+
+    /* ========================================
+       FIX TRANSAKSI HP PORTRAIT - NATURAL FLOW
+       ======================================== */
+
+    /* CRITICAL: Disable independent scroll di HP Portrait */
+    .main-pos-container {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .transaction-column {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .transaction-column>.card {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .transaction-column .card-body.p-0 {
+        overflow: visible !important;
+    }
+
+    /* Cart Items - Auto Height, No Max Height */
+    #cart-items {
+        height: auto !important;
+        max-height: none !important;
+        min-height: auto !important;
+        overflow: visible !important;
+        flex: none !important;
+    }
+
+    /* Cart Summary - NOT Sticky, natural flow */
+    .cart-summary {
+        position: relative !important;
+        bottom: auto !important;
+        margin-top: 1rem !important;
+    }
+}
