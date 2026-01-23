@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v38'; // v38 - New PWA Installation Logo
+const CACHE_NAME = 'dewa-ban-v38.4'; // v38.4 - PWA Logo with Maskable Support
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -6,7 +6,8 @@ const ASSETS_TO_CACHE = [
   './js/app.js',
   './manifest.json',
   './img/logo.png',
-  './img/jasa.png'
+  './img/jasa.png',
+  './img/logoapk.png.jpeg'
 ];
 
 self.addEventListener('install', (event) => {
