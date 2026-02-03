@@ -2377,10 +2377,10 @@ function completePayment() {
         staff: settings.staffName
     };
 
-    // Show receipt
-    showReceipt(transactionData);
+    // ✅ v53: Cetak struk via RawBT Silent Print (bukan window.print lagi)
+    cetakStruk(transactionData);
 
-    // Hide modal after print window is opened (Android PWA can block print if modal/alerts interfere)
+    // Hide modal after print command sent
     paymentModal.hide();
 
     saveTransactionToHistory(transactionData);
@@ -2435,9 +2435,172 @@ function resetCart(skipConfirm = false) {
         updateCart();
         discountEl.value = '0';
         taxEl.value = '0';
-        updateTotals();
     }
 }
+
+// ========================================
+// RAWBT SILENT PRINT FUNCTIONS (v53)
+// ========================================
+
+// Cek status koneksi ke RawBT Server
+async function cekStatusPrinter() {
+    try {
+        await fetch('http://localhost:40213/', {
+            method: 'GET',
+            mode: 'no-cors'
+        });
+        return true;
+    } catch (error) {
+        alert('Printer Belum Siap! Pastikan Server RawBT Aktif');
+        console.error('RawBT Server tidak tersedia:', error);
+        return false;
+    }
+}
+
+// Fungsi untuk format teks struk dengan padding yang benar (32 karakter)
+function formatStrukLine(left, right, width = 32) {
+    const leftStr = String(left);
+    const rightStr = String(right);
+    const spaces = Math.max(1, width - leftStr.length - rightStr.length);
+    return leftStr + ' '.repeat(spaces) + rightStr;
+}
+
+// Kirim struk ke printer via RawBT dengan ESC/POS encoding yang benar
+async function cetakStruk(transaksi) {
+    // Cek printer dulu
+    const printerReady = await cekStatusPrinter();
+    if (!printerReady) return false;
+
+    try {
+        const paidAtDate = transaksi?.paidAtDate ? new Date(transaksi.paidAtDate) :
+            (transaksi?.date ? new Date(transaksi.date) : new Date());
+        const parts = formatDateTimeParts(paidAtDate);
+        const txNo = transaksi.transactionNo || generateTransactionNo(paidAtDate);
+
+        const subtotal = Number(transaksi.subtotal) || 0;
+        const discount = Number(transaksi.discount) || 0;
+        const taxPercent = Number(transaksi.tax) || 0;
+        const taxableBase = Math.max(0, subtotal - discount);
+        const taxAmount = (taxableBase * taxPercent) / 100;
+        const total = Number(transaksi.total) || taxableBase + taxAmount;
+        const amountPaid = Number(transaksi.payment?.amountPaid) || total;
+        const change = Number(transaksi.payment?.change) || Math.max(0, amountPaid - total);
+
+        // === ENCODING ESC/POS COMMANDS ===
+        // PENTING: Jangan kirim sebagai string! Harus encode ke byte array
+        const encoder = new TextEncoder(); // UTF-8 encoder
+
+        // ESC/POS Commands dalam format byte hexadecimal
+        const ESC = 0x1B;
+        const GS = 0x1D;
+
+        // Command bytes
+        const CMD_INIT = [ESC, 0x40];                    // Initialize printer
+        const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];      // Center align
+        const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];        // Left align
+        const CMD_BOLD_ON = [ESC, 0x45, 0x01];           // Bold ON
+        const CMD_BOLD_OFF = [ESC, 0x45, 0x00];          // Bold OFF
+        const CMD_CUT_PAPER = [GS, 0x56, 0x00];          // Cut paper
+
+        // === BUILD FINAL BYTE ARRAY ===
+        const comandosCompletos = new Uint8Array([
+            ...CMD_INIT,                                  // Init
+            ...CMD_ALIGN_CENTER,                          // Center untuk header
+            ...CMD_BOLD_ON,                               // Bold ON untuk "DEWA BAN"
+            ...encoder.encode('DEWA BAN\n'),
+            ...CMD_BOLD_OFF,                              // Bold OFF
+            ...encoder.encode('Jl. Wolter Monginsidi No.KM.12\n'),
+            ...encoder.encode('Genuksari, Kec. Genuk, Semarang\n'),
+            ...encoder.encode('Telp: 0812-2259-9525\n'),
+            ...CMD_ALIGN_LEFT,                            // Kembali ke left align
+            ...encoder.encode('================================\n'),
+            ...encoder.encode(`No: ${txNo}\n`),
+            ...encoder.encode(`Tgl: ${parts.dateTime}\n`),
+            ...(transaksi.cashier ? encoder.encode(`Kasir: ${transaksi.cashier}\n`) : []),
+            ...(transaksi.staff ? encoder.encode(`Mekanik: ${transaksi.staff}\n`) : []),
+            ...encoder.encode('================================\n'),
+        ]);
+
+        // Tambahkan items
+        const itemsBytes = [];
+        (transaksi.items || []).forEach(it => {
+            const namaBarang = `${it.name} x${it.quantity}`;
+            const harga = `Rp ${formatNumber((Number(it.price) || 0) * (Number(it.quantity) || 0))}`;
+            const maxNamaLen = 32 - harga.length - 1;
+            const namaTerpotong = namaBarang.length > maxNamaLen
+                ? namaBarang.substring(0, maxNamaLen)
+                : namaBarang;
+            const line = formatStrukLine(namaTerpotong, harga, 32) + '\n';
+            itemsBytes.push(...encoder.encode(line));
+        });
+
+        // Tambahkan total section
+        const totalBytes = [
+            ...encoder.encode('================================\n'),
+            ...encoder.encode(formatStrukLine('Sub Total', `Rp ${formatNumber(subtotal)}`, 32) + '\n'),
+            ...encoder.encode(formatStrukLine('Potongan', `-Rp ${formatNumber(discount)}`, 32) + '\n'),
+            ...encoder.encode(formatStrukLine(`Pajak (${taxPercent}%)`, `Rp ${formatNumber(taxAmount)}`, 32) + '\n'),
+            ...encoder.encode(formatStrukLine('TOTAL', `Rp ${formatNumber(total)}`, 32) + '\n'),
+            ...encoder.encode(formatStrukLine('Dibayar', `Rp ${formatNumber(amountPaid)}`, 32) + '\n'),
+            ...encoder.encode(formatStrukLine('Kembali', `Rp ${formatNumber(change)}`, 32) + '\n'),
+            ...encoder.encode('================================\n'),
+        ];
+
+        // Footer
+        const footerBytes = [
+            ...CMD_ALIGN_CENTER,
+            ...encoder.encode('YOUR TIRE SOLUTION\n'),
+            ...encoder.encode('TERIMA KASIH ATAS KUNJUNGAN ANDA\n'),
+            ...encoder.encode('Barang yang sudah dibeli\n'),
+            ...encoder.encode('tidak dapat ditukar/dikembalikan\n'),
+            ...encoder.encode('\n\n\n'),
+            ...CMD_CUT_PAPER
+        ];
+
+        // Gabungkan semua bytes
+        const allBytes = new Uint8Array([
+            ...comandosCompletos,
+            ...itemsBytes,
+            ...totalBytes,
+            ...footerBytes
+        ]);
+
+        // === ENCODE TO BASE64 ===
+        // Penting: btoa() hanya menerima string, jadi convert byte array ke binary string dulu
+        let binaryString = '';
+        for (let i = 0; i < allBytes.length; i++) {
+            binaryString += String.fromCharCode(allBytes[i]);
+        }
+        const base64Data = btoa(binaryString);
+
+        // === KIRIM KE RAWBT SERVER ===
+        const response = await fetch('http://localhost:40213/print', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                data: base64Data
+            })
+        });
+
+        if (response.ok) {
+            console.log('✅ Struk berhasil dicetak via RawBT');
+            showAlert('Struk berhasil dicetak!', 'success');
+            return true;
+        } else {
+            console.error('❌ RawBT Print gagal:', response.status);
+            showAlert('Gagal mencetak struk', 'danger');
+            return false;
+        }
+
+    } catch (error) {
+        console.error('❌ Error cetakStruk:', error);
+        showAlert('Error: ' + error.message, 'danger');
+        return false;
+    }
+}
+
 
 // Show receipt
 function showReceipt(transaction) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v43.1-fix-png'; // v43.1 - Fix PNG Logo
+const CACHE_NAME = 'dewa-ban-v53-rawbt-silent'; // v53 - Silent Print via RawBT Server
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -36,6 +36,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
 
   const url = new URL(request.url);
+
+  // JANGAN cache request ke RawBT Printer Server (localhost:40213)
+  if (url.hostname === 'localhost' && url.port === '40213') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   const isSameOrigin = url.origin === self.location.origin;
   const path = isSameOrigin ? url.pathname.replace(/\/+$/, '') : '';
   const isAppShell = isSameOrigin && (

@@ -1220,7 +1220,88 @@ header .container-fluid .row {
     /* Cart Summary - NOT Sticky, natural flow */
     .cart-summary {
         position: relative !important;
-        bottom: auto !important;
-        margin-top: 1rem !important;
+    }
+}
+
+/* ========================================
+   QUICK EDIT STYLES (v53)
+   ======================================== */
+
+/* Editable field indicator */
+.editable-field {
+    cursor: pointer;
+    position: relative;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background-color 0.2s, border-color 0.2s;
+    border: 1px solid transparent;
+}
+
+.editable-field:hover {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+}
+
+/* Pencil icon hint (muncul saat hover) */
+.editable-field::before {
+    content: '✏️';
+    font-size: 0.7em;
+    opacity: 0;
+    margin-right: 4px;
+    transition: opacity 0.2s;
+}
+
+.editable-field:hover::before {
+    opacity: 0.6;
+}
+
+/* Input field saat mode edit */
+.quick-edit-input {
+    display: inline-block !important;
+    padding: 4px 8px !important;
+    font-size: inherit !important;
+    border: 2px solid #007bff !important;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3) !important;
+    border-radius: 4px !important;
+}
+
+.quick-edit-input:focus {
+    outline: none !important;
+    border-color: #0056b3 !important;
+    box-shadow: 0 0 8px rgba(0, 86, 179, 0.5) !important;
+}
+
+/* Pastikan kartu produk tetap sama dimensinya */
+.product-card {
+    min-height: 180px;
+}
+
+.product-card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Editable field dalam kartu produk - styling khusus */
+.product-card .editable-name {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.product-card .editable-stock,
+.product-card .editable-price {
+    font-size: 0.9rem;
+}
+
+/* Mobile responsiveness untuk Quick Edit */
+@media (max-width: 576px) {
+    .quick-edit-input {
+        font-size: 0.85rem !important;
+        padding: 3px 6px !important;
+    }
+
+    .editable-field::before {
+        font-size: 0.6em;
     }
 }

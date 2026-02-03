@@ -1,7 +1,7 @@
 {
   "name": "DEWA BAN",
   "short_name": "DEWA BAN",
-  "id": "/dewa-ban-v43/",
+  "id": "/dewa-ban-v53/",
   "start_url": "./index.html",
   "scope": ".",
   "display": "standalone",
