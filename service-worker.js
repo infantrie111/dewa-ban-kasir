@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v53.4-edit-upgrade'; // v53.4 - Edit Upgrade with Image & Brand
+const CACHE_NAME = 'dewa-ban-v54-compress-upgrade'; // v54 - Auto-Compress Upload & Minimalist Edit UI
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

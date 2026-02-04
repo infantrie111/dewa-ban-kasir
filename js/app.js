@@ -1262,33 +1262,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Image preview when file is selected
+    // Image preview when file is selected (UNLIMITED SIZE - AUTO COMPRESS)
     if (newImageEl) {
-        newImageEl.addEventListener('change', (e) => {
+        newImageEl.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             const preview = document.getElementById('image-preview');
+            const uploadStatus = document.getElementById('upload-status');
 
             if (file && preview) {
-                // Validate file type
+                // Validate file type only (NO SIZE LIMIT)
                 if (!file.type.startsWith('image/')) {
                     showAlert('File harus berupa gambar', 'warning');
                     e.target.value = '';
                     return;
                 }
 
-                // Validate file size (max 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showAlert('Ukuran gambar maksimal 5MB', 'warning');
-                    e.target.value = '';
-                    return;
-                }
+                try {
+                    // Show compressing status
+                    if (uploadStatus) {
+                        uploadStatus.classList.remove('d-none');
+                        uploadStatus.textContent = 'Sedang mengompres...';
+                        uploadStatus.classList.remove('text-success', 'text-danger');
+                        uploadStatus.classList.add('text-muted');
+                    }
 
-                // Show preview
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    preview.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
+                    // Auto-compress image (accepts ANY size)
+                    const compressedBase64 = await compressImage(file);
+                    preview.src = compressedBase64;
+
+                    // Update status
+                    if (uploadStatus) {
+                        uploadStatus.textContent = `Gambar siap (${Math.round(file.size / 1024)}KB → compressed)`;
+                        uploadStatus.classList.remove('text-muted');
+                        uploadStatus.classList.add('text-success');
+                    }
+                } catch (err) {
+                    console.error('Compression error:', err);
+                    // Fallback to original preview
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        preview.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+
+                    if (uploadStatus) {
+                        uploadStatus.textContent = 'Kompres gagal, menggunakan asli';
+                        uploadStatus.classList.add('text-warning');
+                    }
+                }
             } else if (preview) {
                 preview.src = 'img/logo.png';
             }
@@ -1402,8 +1423,10 @@ function displayProducts(productsToDisplay) {
 
         productCard.innerHTML = `
             <div class="card product-card h-100" data-id="${product.id}">
-                <!-- Edit Badge (v53 Integrated) -->
-                <div class="edit-badge" onclick="event.stopPropagation(); openEditModal('${product.id}')">✏️</div>
+                <!-- Edit Badge (v54 - Minimalist) -->
+                <div class="edit-badge" onclick="event.stopPropagation(); openEditModal('${product.id}')">
+                    <i class="bi bi-pencil-fill" style="font-size: 14px;"></i>
+                </div>
 
                 <!-- Brand Logo Badge (Overlay) -->
                 <div class="brand-logo-badge">
@@ -1462,11 +1485,35 @@ function getUniqueBrands() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
+// ========================================
+// RENDER BRAND LIST (v54 - Fixed Image Logic)
+// Priority: 1. Master Data (LocalStorage Base64)
+//           2. Cloudinary URL (http)
+//           3. Fallback Local (img/brand.png)
+// ========================================
 function renderBrandList() {
     activeView = 'brands';
     activeBrand = null;
 
     const brands = getUniqueBrands();
+
+    // Load categories from LocalStorage (Master Data with Base64 logos)
+    const categoriesRaw = localStorage.getItem('categories');
+    let categoriesMap = new Map();
+    if (categoriesRaw) {
+        try {
+            const categoriesArray = JSON.parse(categoriesRaw);
+            if (Array.isArray(categoriesArray)) {
+                categoriesArray.forEach(cat => {
+                    if (cat.name && cat.logo) {
+                        categoriesMap.set(cat.name.toUpperCase(), cat.logo);
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('Failed to parse categories from LocalStorage:', e);
+        }
+    }
 
     productList.innerHTML = '';
 
@@ -1474,21 +1521,35 @@ function renderBrandList() {
         const col = document.createElement('div');
         col.className = 'col-3 col-md-4 col-lg-3 mb-3';
 
-        // PRIORITIZED: Aggressively search for Cloudinary URL in ALL products of this brand
-        // Logika: Scan seluruh database (find) untuk menemukan satu produk dari brand ini yang punya logo URL valid
-        const internetLogo = products.find(p =>
-            p.brand &&
-            p.brand.toUpperCase() === brand.toUpperCase() &&
-            p.logo &&
-            p.logo.startsWith('http')
-        )?.logo;
+        const brandUpper = brand.toUpperCase();
 
-        const image = internetLogo || getBrandImage(brand);
+        // PRIORITY 1: Check Master Data (LocalStorage categories with Base64)
+        let image = categoriesMap.get(brandUpper);
+
+        // PRIORITY 2: Check product.logo field for Cloudinary URL or Base64
+        if (!image) {
+            const productWithLogo = products.find(p =>
+                p.brand &&
+                p.brand.toUpperCase() === brandUpper &&
+                p.logo &&
+                (p.logo.startsWith('http') || p.logo.startsWith('data:image'))
+            );
+            if (productWithLogo) {
+                image = productWithLogo.logo;
+            }
+        }
+
+        // PRIORITY 3: Fallback to local img/brand.png
+        if (!image) {
+            image = getBrandImage(brand);
+        }
 
         col.innerHTML = `
             <div class="card product-card h-100" data-brand="${brand}" data-brand-logo="${image}">
-                <!-- Brand Edit Badge (v53.4) -->
-                <div class="brand-edit-badge" onclick="event.stopPropagation(); openBrandEditModal('${brand}')">✏️</div>
+                <!-- Brand Edit Badge (v54 - Minimalist) -->
+                <div class="brand-edit-badge" onclick="event.stopPropagation(); openBrandEditModal('${brand}')">
+                    <i class="bi bi-pencil-fill" style="font-size: 14px;"></i>
+                </div>
                 
                 <img src="${image}" class="card-img-top" alt="${brand}" onerror="this.onerror=null;this.src='https://res.cloudinary.com/dxdstqvad/image/upload/v1737597143/produk_dewa_ban/placeholder_tire_grey.png';">
                 <div class="card-body p-2 text-center">
@@ -1816,100 +1877,69 @@ async function uploadImageToStorage(file, productId) {
     }
 }
 
-// Compress image before upload with aggressive compression targeting 100KB-200KB
-function compressImage(file, targetMinSize = 100 * 1024, targetMaxSize = 200 * 1024) {
-    return new Promise((resolve) => {
-        // If file is already within target range, use it
-        if (file.size >= targetMinSize && file.size <= targetMaxSize) {
-            console.log(`Image already optimal: ${file.size} bytes`);
-            resolve(file);
-            return;
-        }
+// ========================================
+// UNIVERSAL IMAGE COMPRESSION UTILITY (v54)
+// Designed to handle UNLIMITED file sizes (10MB+)
+// Max width: 800px, Quality: 70% JPEG
+// Output: Base64 String for LocalStorage/Firebase
+// ========================================
 
-        // If file is smaller than minimum, don't compress
-        if (file.size < targetMinSize) {
-            console.log(`Image too small to compress: ${file.size} bytes`);
-            resolve(file);
-            return;
-        }
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        console.log(`🔄 Compressing image: ${file.name} (${Math.round(file.size / 1024)}KB)`);
 
         const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read file'));
         reader.onload = (e) => {
             const img = new Image();
+            img.onerror = () => reject(new Error('Failed to load image'));
             img.onload = () => {
-                // Helper function to compress with specific parameters
-                const compressWithParams = (maxWidth, quality) => {
-                    return new Promise((resolveCompress) => {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 800;
+                const QUALITY = 0.7;
 
-                        // Calculate new dimensions
-                        if (width > maxWidth) {
-                            height = Math.round((height * maxWidth) / width);
-                            width = maxWidth;
-                        }
+                let width = img.width;
+                let height = img.height;
 
-                        canvas.width = width;
-                        canvas.height = height;
+                // Resize if width exceeds MAX_WIDTH
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
 
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
+                canvas.width = width;
+                canvas.height = height;
 
-                        canvas.toBlob((blob) => {
-                            resolveCompress(blob);
-                        }, 'image/jpeg', quality);
-                    });
-                };
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
 
-                // Iterative compression algorithm
-                const findOptimalCompression = async () => {
-                    const originalSize = file.size;
+                // Convert to Base64 JPEG
+                const base64 = canvas.toDataURL('image/jpeg', QUALITY);
 
-                    // Start with aggressive settings for large files (5MB+)
-                    let maxWidth = originalSize > 5 * 1024 * 1024 ? 600 : 800;
-                    let quality = originalSize > 5 * 1024 * 1024 ? 0.6 : 0.7;
+                const originalSize = file.size;
+                // Estimate compressed size (Base64 is ~1.37x binary size)
+                const compressedEstimate = Math.round((base64.length * 3) / 4);
+                const compressionRatio = ((1 - compressedEstimate / originalSize) * 100).toFixed(1);
 
-                    let blob = await compressWithParams(maxWidth, quality);
+                console.log(`✅ Image compressed: ${Math.round(originalSize / 1024)}KB → ~${Math.round(compressedEstimate / 1024)}KB (${compressionRatio}% reduction)`);
+                console.log(`   Dimensions: ${img.width}x${img.height} → ${width}x${height}`);
 
-                    // If still too large, reduce further
-                    while (blob.size > targetMaxSize && (maxWidth > 400 || quality > 0.3)) {
-                        if (blob.size > targetMaxSize * 2) {
-                            // Much too large, reduce both dimensions and quality
-                            maxWidth = Math.max(400, Math.round(maxWidth * 0.8));
-                            quality = Math.max(0.3, quality - 0.1);
-                        } else {
-                            // Slightly too large, reduce quality only
-                            quality = Math.max(0.3, quality - 0.05);
-                        }
-                        blob = await compressWithParams(maxWidth, quality);
-                    }
-
-                    // If too small, try to increase quality (but prioritize speed)
-                    if (blob.size < targetMinSize && quality < 0.85) {
-                        quality = Math.min(0.85, quality + 0.1);
-                        const newBlob = await compressWithParams(maxWidth, quality);
-                        if (newBlob.size <= targetMaxSize) {
-                            blob = newBlob;
-                        }
-                    }
-
-                    const compressedFile = new File([blob], file.name, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now()
-                    });
-
-                    const compressionRatio = ((1 - compressedFile.size / originalSize) * 100).toFixed(1);
-                    console.log(`✅ Image compressed: ${Math.round(originalSize / 1024)}KB → ${Math.round(compressedFile.size / 1024)}KB (${compressionRatio}% reduction)`);
-
-                    resolve(compressedFile);
-                };
-
-                findOptimalCompression();
+                resolve(base64);
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
+    });
+}
+
+// Wrapper function for backwards compatibility (returns File object)
+async function compressImageToFile(file) {
+    const base64 = await compressImage(file);
+    const response = await fetch(base64);
+    const blob = await response.blob();
+    return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+        type: 'image/jpeg',
+        lastModified: Date.now()
     });
 }
 
@@ -2794,31 +2824,41 @@ if (newBrandEl) {
     newBrandEl.addEventListener('change', toggleBrandLogoInput);
 }
 
-// Brand logo file input change event (preview)
+// Brand logo file input change event (preview) - UNLIMITED SIZE
 if (brandLogoInput) {
-    brandLogoInput.addEventListener('change', (e) => {
+    brandLogoInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (file && brandLogoPreview) {
-            // Validate file type
+            // Validate file type only (NO SIZE LIMIT)
             if (!file.type.startsWith('image/')) {
                 showAlert('File harus berupa gambar', 'warning');
                 e.target.value = '';
                 return;
             }
 
-            // Validate file size (max 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                showAlert('Ukuran gambar maksimal 5MB', 'warning');
-                e.target.value = '';
-                return;
-            }
+            try {
+                // Show compressing status
+                const statusEl = document.querySelector('#brand-logo-container .text-muted');
+                if (statusEl) {
+                    statusEl.innerHTML = '<i class="bi bi-arrow-repeat spin me-1"></i>Sedang mengompres...';
+                }
 
-            // Show preview
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                brandLogoPreview.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
+                // Auto-compress
+                const compressedBase64 = await compressImage(file);
+                brandLogoPreview.src = compressedBase64;
+
+                if (statusEl) {
+                    statusEl.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Logo siap (${Math.round(file.size / 1024)}KB → compressed)`;
+                }
+            } catch (err) {
+                console.error('Compression error:', err);
+                // Fallback
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    brandLogoPreview.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
         } else if (brandLogoPreview) {
             brandLogoPreview.src = 'img/logo.png';
         }
@@ -2885,56 +2925,113 @@ window.openEditModal = function (productId) {
     }
 };
 
-// Handle product image preview on file select
+// Handle product image preview on file select (UNLIMITED SIZE - AUTO COMPRESS)
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('qe-product-image');
     const preview = document.getElementById('qe-product-image-preview');
+    const statusLabel = document.querySelector('#quickEditModal .text-muted');
 
     if (fileInput && preview) {
-        fileInput.addEventListener('change', (e) => {
+        fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Validate size (max 2MB)
-            if (file.size > 2 * 1024 * 1024) {
-                alert('Ukuran gambar maksimal 2MB');
+            // Validate type only (NO SIZE LIMIT)
+            if (!file.type.startsWith('image/')) {
+                alert('File harus berupa gambar');
                 e.target.value = '';
                 return;
             }
 
-            // Read as Base64
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                pendingProductImage = event.target.result;
+            try {
+                // Show compressing status
+                if (statusLabel) {
+                    statusLabel.textContent = 'Sedang mengompres...';
+                    statusLabel.classList.remove('text-success', 'text-danger');
+                    statusLabel.classList.add('text-warning');
+                }
+
+                // Auto-compress image (accepts ANY size)
+                const compressedBase64 = await compressImage(file);
+                pendingProductImage = compressedBase64;
                 preview.src = pendingProductImage;
-            };
-            reader.readAsDataURL(file);
+
+                // Update status
+                if (statusLabel) {
+                    statusLabel.textContent = `Siap disimpan (${Math.round(file.size / 1024)}KB → compressed)`;
+                    statusLabel.classList.remove('text-warning');
+                    statusLabel.classList.add('text-success');
+                }
+            } catch (err) {
+                console.error('Compression error:', err);
+                // Fallback to Base64 without compression
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    pendingProductImage = event.target.result;
+                    preview.src = pendingProductImage;
+                };
+                reader.readAsDataURL(file);
+
+                if (statusLabel) {
+                    statusLabel.textContent = 'Kompres gagal, disimpan tanpa kompres';
+                    statusLabel.classList.remove('text-warning', 'text-success');
+                    statusLabel.classList.add('text-danger');
+                }
+            }
         });
     }
 
-    // Brand logo preview handler
+    // Brand logo preview handler (UNLIMITED SIZE - AUTO COMPRESS)
     const brandLogoInput = document.getElementById('be-brand-logo');
     const brandLogoPreview = document.getElementById('be-brand-logo-preview');
+    const brandStatusLabel = document.querySelector('#brandEditModal .text-muted');
 
     if (brandLogoInput && brandLogoPreview) {
-        brandLogoInput.addEventListener('change', (e) => {
+        brandLogoInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            // Validate size (max 1MB)
-            if (file.size > 1 * 1024 * 1024) {
-                alert('Ukuran logo maksimal 1MB');
+            // Validate type only (NO SIZE LIMIT)
+            if (!file.type.startsWith('image/')) {
+                alert('File harus berupa gambar');
                 e.target.value = '';
                 return;
             }
 
-            // Read as Base64
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                pendingBrandLogo = event.target.result;
+            try {
+                // Show compressing status
+                if (brandStatusLabel) {
+                    brandStatusLabel.textContent = 'Sedang mengompres...';
+                    brandStatusLabel.classList.remove('text-success', 'text-danger');
+                    brandStatusLabel.classList.add('text-warning');
+                }
+
+                // Auto-compress image (accepts ANY size)
+                const compressedBase64 = await compressImage(file);
+                pendingBrandLogo = compressedBase64;
                 brandLogoPreview.src = pendingBrandLogo;
-            };
-            reader.readAsDataURL(file);
+
+                // Update status
+                if (brandStatusLabel) {
+                    brandStatusLabel.textContent = `Logo siap (${Math.round(file.size / 1024)}KB → compressed)`;
+                    brandStatusLabel.classList.remove('text-warning');
+                    brandStatusLabel.classList.add('text-success');
+                }
+            } catch (err) {
+                console.error('Compression error:', err);
+                // Fallback to Base64 without compression
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    pendingBrandLogo = event.target.result;
+                    brandLogoPreview.src = pendingBrandLogo;
+                };
+                reader.readAsDataURL(file);
+
+                if (brandStatusLabel) {
+                    brandStatusLabel.textContent = 'Kompres gagal';
+                    brandStatusLabel.classList.add('text-danger');
+                }
+            }
         });
     }
 });
