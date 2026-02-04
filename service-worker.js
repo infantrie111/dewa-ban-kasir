@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v54-compress-upgrade'; // v54 - Auto-Compress Upload & Minimalist Edit UI
+const CACHE_NAME = 'dewa-ban-v55-monthly-report'; // v55 - Monthly Report Download & Responsive Buttons
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

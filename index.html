@@ -195,12 +195,26 @@
                         <input type="text" class="form-control" id="settings-staff-name" autocomplete="off" />
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                    <button type="button" class="btn btn-success" id="download-daily-report-btn">
-                        <i class="bi bi-file-earmark-excel me-1"></i>Download Rekap Hari Ini
-                    </button>
-                    <button type="button" class="btn btn-primary" id="save-settings-btn">Simpan</button>
+                <div class="modal-footer d-flex flex-column w-100 gap-2">
+                    <!-- Baris 1: Download Buttons -->
+                    <div class="d-flex w-100 gap-2">
+                        <button type="button" class="btn btn-success flex-fill" id="download-daily-report-btn">
+                            <i class="bi bi-file-earmark-excel me-1"></i>Rekap Harian
+                        </button>
+                        <button type="button" class="btn btn-info text-white flex-fill"
+                            id="download-monthly-report-btn">
+                            <i class="bi bi-calendar-check me-1"></i>Rekap Bulanan
+                        </button>
+                    </div>
+                    <!-- Baris 2: Action Buttons -->
+                    <div class="d-flex w-100 gap-2">
+                        <button type="button" class="btn btn-secondary flex-fill" data-bs-dismiss="modal">
+                            Tutup
+                        </button>
+                        <button type="button" class="btn btn-primary flex-fill" id="save-settings-btn">
+                            Simpan
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

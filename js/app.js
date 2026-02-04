@@ -377,6 +377,7 @@ const settingsStaffNameInput = document.getElementById('settings-staff-name');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const settingsModalEl = document.getElementById('settingsModal');
 const downloadDailyReportBtn = document.getElementById('download-daily-report-btn');
+const downloadMonthlyReportBtn = document.getElementById('download-monthly-report-btn');
 
 const adminModalEl = document.getElementById('adminModal');
 const openAdminModalBtn = document.getElementById('open-admin-modal');
@@ -979,6 +980,78 @@ function downloadDailyReport() {
     downloadCSV(csv, filename);
 }
 
+// Helper untuk cek apakah tanggal sama bulan & tahun
+function isSameLocalMonth(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+// Nama bulan dalam Bahasa Indonesia
+function getMonthName(monthIndex) {
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    return months[monthIndex] || '';
+}
+
+function downloadMonthlyReport() {
+    const history = getTransactionHistory();
+    const today = new Date();
+    const monthName = getMonthName(today.getMonth());
+    const year = today.getFullYear();
+    const filename = `Rekap_Bulanan_${monthName}_${year}.csv`;
+
+    const thisMonth = history.filter(t => {
+        const d = new Date(t.date);
+        return isSameLocalMonth(d, today);
+    });
+
+    if (thisMonth.length === 0) {
+        showAlert(`Belum ada transaksi di bulan ${monthName} ${year}`, 'warning');
+        return;
+    }
+
+    let grandTotal = 0;
+    let grandProfit = 0;
+
+    const header = 'Tanggal,Jam,No Transaksi,Kasir,Item,Nominal,Harga Modal,Laba per Item';
+    const rows = [];
+
+    thisMonth.forEach(t => {
+        const d = new Date(t.date);
+        const parts = formatDateTimeParts(d);
+        const jam = parts.time.slice(0, 5);
+        const kasir = t.cashier || '';
+        const noTrx = t.transactionNo || '';
+
+        (t.items || []).forEach(it => {
+            const itemName = it.quantity && it.quantity > 1 ? `${it.name} x${it.quantity}` : it.name;
+            const qty = Number(it.quantity) || 0;
+            const price = Number(it.price) || 0;
+            const nominal = price * qty;
+            const rawCost = Number(it.costPrice);
+            const costPrice = Number.isFinite(rawCost) ? Math.max(0, rawCost) : Math.round(price * 0.8);
+            const profit = (price - costPrice) * qty;
+            grandTotal += nominal;
+            grandProfit += profit;
+
+            rows.push([
+                parts.date,
+                jam,
+                noTrx,
+                kasir,
+                itemName,
+                nominal,
+                costPrice,
+                profit
+            ].map(escapeCSV).join(','));
+        });
+    });
+
+    const summaryRowRevenue = [`TOTAL PENDAPATAN BULAN ${monthName.toUpperCase()} ${year}`, '', '', '', '', grandTotal, '', ''].map(escapeCSV).join(',');
+    const summaryRowProfit = [`TOTAL LABA BULAN ${monthName.toUpperCase()} ${year}`, '', '', '', '', '', '', grandProfit].map(escapeCSV).join(',');
+    const csv = `${header}\n${rows.join('\n')}\n\n${summaryRowRevenue}\n${summaryRowProfit}`;
+    downloadCSV(csv, filename);
+}
+
 // ========================================
 // AUTHENTICATION FUNCTIONS
 // ========================================
@@ -1223,6 +1296,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (downloadDailyReportBtn) {
         downloadDailyReportBtn.addEventListener('click', () => {
             downloadDailyReport();
+        });
+    }
+
+    if (downloadMonthlyReportBtn) {
+        downloadMonthlyReportBtn.addEventListener('click', () => {
+            downloadMonthlyReport();
         });
     }
 
