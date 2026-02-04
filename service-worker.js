@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dewa-ban-v53-rawbt-silent'; // v53 - Silent Print via RawBT Server
+const CACHE_NAME = 'dewa-ban-v53.4-edit-upgrade'; // v53.4 - Edit Upgrade with Image & Brand
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

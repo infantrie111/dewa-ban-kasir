@@ -1402,6 +1402,9 @@ function displayProducts(productsToDisplay) {
 
         productCard.innerHTML = `
             <div class="card product-card h-100" data-id="${product.id}">
+                <!-- Edit Badge (v53 Integrated) -->
+                <div class="edit-badge" onclick="event.stopPropagation(); openEditModal('${product.id}')">✏️</div>
+
                 <!-- Brand Logo Badge (Overlay) -->
                 <div class="brand-logo-badge">
                     <img src="${brandLogoSrc}" alt="${product.brand}" onerror="this.onerror=null;this.src='img/logo.png?v=1';">
@@ -1483,7 +1486,10 @@ function renderBrandList() {
         const image = internetLogo || getBrandImage(brand);
 
         col.innerHTML = `
-            <div class="card product-card h-100" data-brand="${brand}">
+            <div class="card product-card h-100" data-brand="${brand}" data-brand-logo="${image}">
+                <!-- Brand Edit Badge (v53.4) -->
+                <div class="brand-edit-badge" onclick="event.stopPropagation(); openBrandEditModal('${brand}')">✏️</div>
+                
                 <img src="${image}" class="card-img-top" alt="${brand}" onerror="this.onerror=null;this.src='https://res.cloudinary.com/dxdstqvad/image/upload/v1737597143/produk_dewa_ban/placeholder_tire_grey.png';">
                 <div class="card-body p-2 text-center">
                     <h6 class="card-title mb-0">${brand}</h6>
@@ -2831,3 +2837,268 @@ auth.onAuthStateChanged((user) => {
         }, 500);
     }
 });
+
+
+// ===================================
+// QUICK EDIT INTEGRATED FUNCTIONS (v53.4)
+// ===================================
+
+// Temporary storage for new images (Base64)
+let pendingProductImage = null;
+let pendingBrandLogo = null;
+
+window.openEditModal = function (productId) {
+    // Reset pending image
+    pendingProductImage = null;
+
+    // Cari produk
+    const product = products.find(p => p.id == productId);
+    if (!product) {
+        console.error('Produk tidak ditemukan:', productId);
+        return;
+    }
+
+    // Isi Form
+    const costPrice = product.costPrice || 0;
+
+    document.getElementById('qe-product-id').value = product.id;
+    document.getElementById('qe-product-name').value = product.name;
+    document.getElementById('qe-product-stock').value = product.stock;
+    document.getElementById('qe-product-price').value = product.price;
+    document.getElementById('qe-product-cost').value = costPrice;
+
+    // Set image preview
+    const preview = document.getElementById('qe-product-image-preview');
+    if (preview) {
+        preview.src = product.image || 'img/logo.png';
+    }
+
+    // Reset file input
+    const fileInput = document.getElementById('qe-product-image');
+    if (fileInput) fileInput.value = '';
+
+    // Tampilkan Modal
+    const modalEl = document.getElementById('quickEditModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+};
+
+// Handle product image preview on file select
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('qe-product-image');
+    const preview = document.getElementById('qe-product-image-preview');
+
+    if (fileInput && preview) {
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate size (max 2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Ukuran gambar maksimal 2MB');
+                e.target.value = '';
+                return;
+            }
+
+            // Read as Base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                pendingProductImage = event.target.result;
+                preview.src = pendingProductImage;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Brand logo preview handler
+    const brandLogoInput = document.getElementById('be-brand-logo');
+    const brandLogoPreview = document.getElementById('be-brand-logo-preview');
+
+    if (brandLogoInput && brandLogoPreview) {
+        brandLogoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate size (max 1MB)
+            if (file.size > 1 * 1024 * 1024) {
+                alert('Ukuran logo maksimal 1MB');
+                e.target.value = '';
+                return;
+            }
+
+            // Read as Base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                pendingBrandLogo = event.target.result;
+                brandLogoPreview.src = pendingBrandLogo;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+});
+
+window.saveProductChange = function () {
+    const id = document.getElementById('qe-product-id').value;
+    const name = document.getElementById('qe-product-name').value;
+    const stock = Number(document.getElementById('qe-product-stock').value);
+    const price = Number(document.getElementById('qe-product-price').value);
+    const cost = Number(document.getElementById('qe-product-cost').value);
+
+    // Validasi Sederhana
+    if (stock < 0 || price < 0 || cost < 0) {
+        alert('Nilai tidak boleh negatif');
+        return;
+    }
+
+    // Update Array Produk
+    const index = products.findIndex(p => p.id == id);
+    if (index !== -1) {
+        products[index].name = name;
+        products[index].stock = stock;
+        products[index].price = price;
+        products[index].costPrice = cost;
+
+        // Update image if new one was uploaded
+        if (pendingProductImage) {
+            products[index].image = pendingProductImage;
+        }
+
+        // Simpan ke LocalStorage
+        localStorage.setItem('products', JSON.stringify(products));
+
+        // Update Firebase (Jika tersedia)
+        if (typeof db !== 'undefined' && typeof firebase !== 'undefined') {
+            const updateData = {
+                name: name,
+                stock: stock,
+                price: price,
+                costPrice: cost
+            };
+
+            if (pendingProductImage) {
+                updateData.image = pendingProductImage;
+            }
+
+            db.ref('products/' + id).update(updateData).then(() => {
+                console.log('Firebase updated');
+            }).catch(err => {
+                console.error('Firebase update failed', err);
+            });
+        }
+
+        // Reset pending image
+        pendingProductImage = null;
+
+        // Render Ulang / Reload
+        alert('Produk berhasil diperbarui!');
+        window.location.reload();
+    } else {
+        alert('Gagal menemukan produk untuk diupdate');
+    }
+};
+
+// ===================================
+// BRAND EDIT FUNCTIONS (v53.4 - NEW)
+// ===================================
+
+window.openBrandEditModal = function (brandName) {
+    // Reset pending logo
+    pendingBrandLogo = null;
+
+    // Store original brand name for cascade update
+    document.getElementById('be-brand-original').value = brandName;
+    document.getElementById('be-brand-name').value = brandName;
+
+    // Find a product with this brand to get existing logo
+    const productWithLogo = products.find(p =>
+        p.brand && p.brand.toUpperCase() === brandName.toUpperCase() && p.logo
+    );
+
+    const logoUrl = productWithLogo?.logo || getBrandImage(brandName);
+
+    // Set logo preview
+    const preview = document.getElementById('be-brand-logo-preview');
+    if (preview) {
+        preview.src = logoUrl;
+    }
+
+    // Reset file input
+    const fileInput = document.getElementById('be-brand-logo');
+    if (fileInput) fileInput.value = '';
+
+    // Tampilkan Modal
+    const modalEl = document.getElementById('brandEditModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+};
+
+window.saveBrandChange = function () {
+    const originalBrand = document.getElementById('be-brand-original').value;
+    const newBrandName = document.getElementById('be-brand-name').value.trim();
+
+    // Validasi
+    if (!newBrandName || newBrandName.length < 2) {
+        alert('Nama merek minimal 2 karakter');
+        return;
+    }
+
+    // Count products affected
+    const affectedProducts = products.filter(p =>
+        p.brand && p.brand.toUpperCase() === originalBrand.toUpperCase()
+    );
+
+    if (affectedProducts.length === 0) {
+        alert('Tidak ada produk dengan merek ini');
+        return;
+    }
+
+    // Confirm if brand name changed
+    if (originalBrand !== newBrandName) {
+        const confirmMsg = `Anda akan mengubah nama merek "${originalBrand}" menjadi "${newBrandName}".\n\n` +
+            `${affectedProducts.length} produk akan terupdate.\n\nLanjutkan?`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+    }
+
+    // CASCADE UPDATE: Update all products with this brand
+    affectedProducts.forEach(product => {
+        const idx = products.findIndex(p => p.id === product.id);
+        if (idx !== -1) {
+            // Update brand name
+            products[idx].brand = newBrandName;
+
+            // Update logo if new one was uploaded
+            if (pendingBrandLogo) {
+                products[idx].logo = pendingBrandLogo;
+            }
+
+            // Update Firebase if available
+            if (typeof db !== 'undefined' && typeof firebase !== 'undefined') {
+                const updateData = { brand: newBrandName };
+                if (pendingBrandLogo) {
+                    updateData.logo = pendingBrandLogo;
+                }
+
+                db.ref('products/' + product.id).update(updateData).catch(err => {
+                    console.error('Firebase update failed for product', product.id, err);
+                });
+            }
+        }
+    });
+
+    // Save to LocalStorage
+    localStorage.setItem('products', JSON.stringify(products));
+
+    // Reset pending logo
+    pendingBrandLogo = null;
+
+    // Success message
+    alert(`Merek berhasil diubah!\n${affectedProducts.length} produk terupdate.`);
+    window.location.reload();
+};
+

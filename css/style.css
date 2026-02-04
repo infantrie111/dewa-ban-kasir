@@ -1224,84 +1224,97 @@ header .container-fluid .row {
 }
 
 /* ========================================
-   QUICK EDIT STYLES (v53)
+   QUICK EDIT INTEGRATED STYLES (v53.4)
    ======================================== */
 
-/* Editable field indicator */
-.editable-field {
-    cursor: pointer;
-    position: relative;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: background-color 0.2s, border-color 0.2s;
-    border: 1px solid transparent;
-}
-
-.editable-field:hover {
-    background-color: #f8f9fa;
-    border-color: #dee2e6;
-}
-
-/* Pencil icon hint (muncul saat hover) */
-.editable-field::before {
-    content: '✏️';
-    font-size: 0.7em;
-    opacity: 0;
-    margin-right: 4px;
-    transition: opacity 0.2s;
-}
-
-.editable-field:hover::before {
-    opacity: 0.6;
-}
-
-/* Input field saat mode edit */
-.quick-edit-input {
-    display: inline-block !important;
-    padding: 4px 8px !important;
-    font-size: inherit !important;
-    border: 2px solid #007bff !important;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3) !important;
-    border-radius: 4px !important;
-}
-
-.quick-edit-input:focus {
-    outline: none !important;
-    border-color: #0056b3 !important;
-    box-shadow: 0 0 8px rgba(0, 86, 179, 0.5) !important;
-}
-
-/* Pastikan kartu produk tetap sama dimensinya */
-.product-card {
-    min-height: 180px;
-}
-
-.product-card .card-body {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-/* Editable field dalam kartu produk - styling khusus */
-.product-card .editable-name {
-    min-height: 40px;
+/* Edit Badge (Pencil Icon) - PRODUCT CARDS */
+.edit-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    /* Pindah ke KIRI */
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: 50%;
+    /* Bulat sempurna */
     display: flex;
     align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 25;
+    /* Higher than brand logo */
+    font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
 }
 
-.product-card .editable-stock,
-.product-card .editable-price {
-    font-size: 0.9rem;
+.edit-badge:hover {
+    transform: scale(1.15);
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
 }
 
-/* Mobile responsiveness untuk Quick Edit */
-@media (max-width: 576px) {
-    .quick-edit-input {
-        font-size: 0.85rem !important;
-        padding: 3px 6px !important;
-    }
+.edit-badge:active {
+    transform: scale(0.9);
+}
 
-    .editable-field::before {
-        font-size: 0.6em;
-    }
+/* Brand Edit Badge - BRAND/CATEGORY CARDS */
+.brand-edit-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #dc3545;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 25;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+}
+
+.brand-edit-badge:hover {
+    transform: scale(1.15);
+    background: #dc3545;
+    color: white;
+}
+
+/* Ensure product card is relative for positioning */
+.product-card {
+    position: relative !important;
+    overflow: visible;
+}
+
+/* Image Preview in Modal */
+.image-preview-container {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.image-preview-container img {
+    max-width: 150px;
+    max-height: 150px;
+    object-fit: contain;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 5px;
+}
+
+/* Modal Overlay Customization */
+.modal-backdrop.show {
+    opacity: 0.7 !important;
+    background-color: #000 !important;
+}
+
+#quickEditModal .modal-content,
+#brandEditModal .modal-content {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
