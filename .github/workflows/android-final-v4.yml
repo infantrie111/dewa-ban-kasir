@@ -18,9 +18,9 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # INI BARIS AJAIBNYA (GENERATE GRADLEW DI SERVER):
-    - name: Generate Gradle Wrapper
-      run: cd android_wrapper && gradle wrapper
+    # KUNCI UTAMA: Paksa server membuat wrapper versi 8.4 secara absolut
+    - name: Force Generate Gradle Wrapper 8.4
+      run: cd android_wrapper && gradle wrapper --gradle-version 8.4
 
     - name: Grant execute permission for gradlew
       run: chmod +x android_wrapper/gradlew
