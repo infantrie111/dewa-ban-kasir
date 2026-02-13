@@ -2554,10 +2554,100 @@ function resetCart(skipConfirm = false) {
 }
 
 // ========================================
-// RAWBT SILENT PRINT FUNCTIONS (v53)
+// PRINTING FUNCTIONS (Web Bluetooth API + RawBT Fallback)
 // ========================================
 
-// Cek status koneksi ke RawBT Server
+// Variabel Global untuk Web Bluetooth
+let bluetoothDevice = null;
+let printCharacteristic = null;
+
+// Service UUIDs yang didukung (Dari Screenshot nRF Connect user: 49535343... transparency service)
+const PRINTER_SERVICES = [
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // VSC / RPP / Chinese Printers (Transparent)
+    '000018f0-0000-1000-8000-00805f9b34fb', // Standard Bluetooth Printer Service
+    'e7810a71-73ae-499d-8c15-faa9aef0c3f2'  // UUID Lain dari screenshot
+];
+
+// Fungsi untuk Connect ke Bluetooth Printer via Chrome
+async function connectToBluetoothPrinter() {
+    try {
+        console.log('🔵 Requesting Bluetooth Device...');
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: PRINTER_SERVICES
+        });
+
+        console.log('🔵 Connecting to GATT Server...');
+        const server = await bluetoothDevice.gatt.connect();
+        console.log('✅ Connected to:', bluetoothDevice.name);
+
+        // Cari Service dan Characteristic yang bisa ditulisi (Write)
+        printCharacteristic = null;
+
+        // 1. Coba Service VSC / Chinese (Prioritas dari screenshot)
+        try {
+            const service = await server.getPrimaryService('49535343-fe7d-4ae5-8fa9-9fafd205e455');
+            // Coba ambil characteristic umum untuk write (biasanya ...5034)
+            printCharacteristic = await service.getCharacteristic('49535034-fe7d-4ae5-8fa9-9fafd205e455');
+            console.log('✅ Found VSC Write Characteristic');
+        } catch (e) {
+            console.warn('⚠️ VSC Service not found or matching characteristic missing, trying next...');
+        }
+
+        // 2. Coba Standard Printer Service (0x18F0)
+        if (!printCharacteristic) {
+            try {
+                const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                printCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+                console.log('✅ Found Standard Write Characteristic');
+            } catch (e) {
+                console.warn('⚠️ Standard Service not found, trying next...');
+            }
+        }
+
+        // 3. Coba UUID e7810... (Dari screenshot)
+        if (!printCharacteristic) {
+            try {
+                const service = await server.getPrimaryService('e7810a71-73ae-499d-8c15-faa9aef0c3f2');
+                // Kita harus cari chr yang punya property WRITE
+                const characteristics = await service.getCharacteristics();
+                for (const c of characteristics) {
+                    if (c.properties.write || c.properties.writeWithoutResponse) {
+                        printCharacteristic = c;
+                        console.log('✅ Found custom Service Write Characteristic:', c.uuid);
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Custom Service e7810... not found or no write char.');
+            }
+        }
+
+        if (!printCharacteristic) {
+            throw new Error('Tidak ditemukan port untuk print (Characteristic Writable) di printer ini.');
+        }
+
+        // Listener jika putus
+        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+        showAlert(`Terhubung ke ${bluetoothDevice.name}!`, 'success');
+        return true;
+
+    } catch (error) {
+        console.error('❌ Bluetooth Connection Error:', error);
+        showAlert('Gagal connect Bluetooth: ' + error.message, 'danger');
+        return false;
+    }
+}
+
+function onDisconnected() {
+    console.log('❌ Bluetooth Disconnected');
+    bluetoothDevice = null;
+    printCharacteristic = null;
+    showAlert('Printer terputus', 'warning');
+}
+
+// Cek status koneksi ke RawBT Server (Fallback)
 async function cekStatusPrinter() {
     try {
         await fetch('http://localhost:40213/', {
@@ -2566,8 +2656,7 @@ async function cekStatusPrinter() {
         });
         return true;
     } catch (error) {
-        alert('Printer Belum Siap! Pastikan Server RawBT Aktif');
-        console.error('RawBT Server tidak tersedia:', error);
+        // Silent error log
         return false;
     }
 }
@@ -2580,13 +2669,10 @@ function formatStrukLine(left, right, width = 32) {
     return leftStr + ' '.repeat(spaces) + rightStr;
 }
 
-// Kirim struk ke printer via RawBT dengan ESC/POS encoding yang benar
+// Kirim struk ke printer
 async function cetakStruk(transaksi) {
-    // Cek printer dulu
-    const printerReady = await cekStatusPrinter();
-    if (!printerReady) return false;
-
     try {
+        // --- PREPARE DATA ---
         const paidAtDate = transaksi?.paidAtDate ? new Date(transaksi.paidAtDate) :
             (transaksi?.date ? new Date(transaksi.date) : new Date());
         const parts = formatDateTimeParts(paidAtDate);
@@ -2602,32 +2688,28 @@ async function cetakStruk(transaksi) {
         const change = Number(transaksi.payment?.change) || Math.max(0, amountPaid - total);
 
         // === ENCODING ESC/POS COMMANDS ===
-        // PENTING: Jangan kirim sebagai string! Harus encode ke byte array
-        const encoder = new TextEncoder(); // UTF-8 encoder
-
-        // ESC/POS Commands dalam format byte hexadecimal
+        const encoder = new TextEncoder();
         const ESC = 0x1B;
         const GS = 0x1D;
 
-        // Command bytes
-        const CMD_INIT = [ESC, 0x40];                    // Initialize printer
-        const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];      // Center align
-        const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];        // Left align
-        const CMD_BOLD_ON = [ESC, 0x45, 0x01];           // Bold ON
-        const CMD_BOLD_OFF = [ESC, 0x45, 0x00];          // Bold OFF
-        const CMD_CUT_PAPER = [GS, 0x56, 0x00];          // Cut paper
+        const CMD_INIT = [ESC, 0x40];
+        const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];
+        const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];
+        const CMD_BOLD_ON = [ESC, 0x45, 0x01];
+        const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
+        const CMD_CUT_PAPER = [GS, 0x56, 0x00];
 
-        // === BUILD FINAL BYTE ARRAY ===
+        // Format Byte Array
         const comandosCompletos = new Uint8Array([
-            ...CMD_INIT,                                  // Init
-            ...CMD_ALIGN_CENTER,                          // Center untuk header
-            ...CMD_BOLD_ON,                               // Bold ON untuk "DEWA BAN"
+            ...CMD_INIT,
+            ...CMD_ALIGN_CENTER,
+            ...CMD_BOLD_ON,
             ...encoder.encode('DEWA BAN\n'),
-            ...CMD_BOLD_OFF,                              // Bold OFF
+            ...CMD_BOLD_OFF,
             ...encoder.encode('Jl. Wolter Monginsidi No.KM.12\n'),
             ...encoder.encode('Genuksari, Kec. Genuk, Semarang\n'),
             ...encoder.encode('Telp: 0812-2259-9525\n'),
-            ...CMD_ALIGN_LEFT,                            // Kembali ke left align
+            ...CMD_ALIGN_LEFT,
             ...encoder.encode('================================\n'),
             ...encoder.encode(`No: ${txNo}\n`),
             ...encoder.encode(`Tgl: ${parts.dateTime}\n`),
@@ -2636,20 +2718,18 @@ async function cetakStruk(transaksi) {
             ...encoder.encode('================================\n'),
         ]);
 
-        // Tambahkan items
         const itemsBytes = [];
         (transaksi.items || []).forEach(it => {
             const namaBarang = `${it.name} x${it.quantity}`;
             const harga = `Rp ${formatNumber((Number(it.price) || 0) * (Number(it.quantity) || 0))}`;
             const maxNamaLen = 32 - harga.length - 1;
             const namaTerpotong = namaBarang.length > maxNamaLen
-                ? namaBarang.substring(0, maxNamaLen)
+                ? namaBarang.substring(0, maxNamaLen) + '...'
                 : namaBarang;
             const line = formatStrukLine(namaTerpotong, harga, 32) + '\n';
             itemsBytes.push(...encoder.encode(line));
         });
 
-        // Tambahkan total section
         const totalBytes = [
             ...encoder.encode('================================\n'),
             ...encoder.encode(formatStrukLine('Sub Total', `Rp ${formatNumber(subtotal)}`, 32) + '\n'),
@@ -2661,7 +2741,6 @@ async function cetakStruk(transaksi) {
             ...encoder.encode('================================\n'),
         ];
 
-        // Footer
         const footerBytes = [
             ...CMD_ALIGN_CENTER,
             ...encoder.encode('YOUR TIRE SOLUTION\n'),
@@ -2672,7 +2751,6 @@ async function cetakStruk(transaksi) {
             ...CMD_CUT_PAPER
         ];
 
-        // Gabungkan semua bytes
         const allBytes = new Uint8Array([
             ...comandosCompletos,
             ...itemsBytes,
@@ -2680,38 +2758,75 @@ async function cetakStruk(transaksi) {
             ...footerBytes
         ]);
 
-        // === ENCODE TO BASE64 ===
-        // Penting: btoa() hanya menerima string, jadi convert byte array ke binary string dulu
-        let binaryString = '';
-        for (let i = 0; i < allBytes.length; i++) {
-            binaryString += String.fromCharCode(allBytes[i]);
-        }
-        const base64Data = btoa(binaryString);
+        // === STRATEGI PENCETAKAN (PRIORITAS) ===
 
-        // === KIRIM KE RAWBT SERVER ===
-        const response = await fetch('http://localhost:40213/print', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                data: base64Data
-            })
-        });
+        // 1. WEB BLUETOOTH API (CHROME DIRECT) - Paling Cepat & Stabil
+        if (bluetoothDevice && bluetoothDevice.gatt.connected && printCharacteristic) {
+            console.log('🔵 Printing via Web Bluetooth...');
 
-        if (response.ok) {
-            console.log('✅ Struk berhasil dicetak via RawBT');
-            showAlert('Struk berhasil dicetak!', 'success');
+            // Tulis data dalam chunk (max 512 bytes per chunk untuk aman)
+            const CHUNK_SIZE = 100; // Kecilkan chunk size untuk kompatibilitas BLE
+            for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
+                const chunk = allBytes.slice(i, i + CHUNK_SIZE);
+                await printCharacteristic.writeValue(chunk);
+                // Delay sedikit antar chunk biar buffer printer gak overflow
+                await new Promise(r => setTimeout(r, 20));
+            }
+
+            showAlert('Struk terkirim ke printer (BLE)', 'success');
             return true;
-        } else {
-            console.error('❌ RawBT Print gagal:', response.status);
-            showAlert('Gagal mencetak struk', 'danger');
-            return false;
         }
+
+        // Jika belum connect, tawarkan connect (User Gesture Required)
+        // Kita coba connect SEKARANG jika user mengklik tombol bayar yang mentrigger ini
+        if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
+            const wantToConnect = confirm("Printer belum terhubung. Mau hubungkan ke Printer Bluetooth sekarang?");
+            if (wantToConnect) {
+                const connected = await connectToBluetoothPrinter();
+                if (connected) {
+                    // Rekursif panggil diri sendiri setelah connect
+                    return cetakStruk(transaksi);
+                }
+            }
+        }
+
+        // 2. ANDROID NATIVE HYBRID (Jika di dalam APK)
+        if (window.Android && window.Android.cetakStruk) {
+            console.log('📱 Printing via Android Native...');
+            let binaryString = '';
+            for (let i = 0; i < allBytes.length; i++) {
+                binaryString += String.fromCharCode(allBytes[i]);
+            }
+            window.Android.cetakStruk(btoa(binaryString));
+            showAlert('Mengirim ke Printer Native...', 'success');
+            return true;
+        }
+
+        // 3. RAWBT FALLBACK (Jika ada aplikasi RawBT terinstall)
+        const printerReady = await cekStatusPrinter();
+        if (printerReady) {
+            console.log('🌍 Printing via RawBT Localhost...');
+            let binaryString = '';
+            for (let i = 0; i < allBytes.length; i++) {
+                binaryString += String.fromCharCode(allBytes[i]);
+            }
+            const base64Data = btoa(binaryString);
+            await fetch('http://localhost:40213/print', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: base64Data })
+            });
+            showAlert('Struk dicetak via RawBT', 'success');
+            return true;
+        }
+
+        // Gagal semua
+        showAlert('Tidak ada printer terhubung (BLE / Native / RawBT)', 'warning');
+        return false;
 
     } catch (error) {
         console.error('❌ Error cetakStruk:', error);
-        showAlert('Error: ' + error.message, 'danger');
+        showAlert('Error Print: ' + error.message, 'danger');
         return false;
     }
 }
