@@ -2571,10 +2571,17 @@ const PRINTER_SERVICES = [
 // Fungsi untuk Connect ke Bluetooth Printer via Chrome
 async function connectToBluetoothPrinter() {
     try {
-        console.log('🔵 Requesting Bluetooth Device...');
+        console.log('🔵 Requesting Bluetooth Device (ALL DEVICES)...');
+        // METODE 2: SCAN SEMUA DEVICE (Lebih Agresif)
         bluetoothDevice = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: PRINTER_SERVICES
+            optionalServices: [
+                '49535343-fe7d-4ae5-8fa9-9fafd205e455', // VSC
+                '000018f0-0000-1000-8000-00805f9b34fb', // Standard
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Custom
+                '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+                '00001801-0000-1000-8000-00805f9b34fb'  // Generic Attribute
+            ]
         });
 
         console.log('🔵 Connecting to GATT Server...');
