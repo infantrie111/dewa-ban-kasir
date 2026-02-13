@@ -1,0 +1,37 @@
+name: Build Android APK V2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    # KUNCI 1: AGP 8.2.0 MEMBUTUHKAN JDK 17 (bukan 11!)
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    # KUNCI 2: Paksa server membuat wrapper versi 8.4 secara absolut
+    # Mencegah Ubuntu-runner memaksa Gradle 9.x yang incompatible
+    - name: Force Generate Gradle Wrapper 8.4
+      run: |
+        cd android_wrapper
+        gradle wrapper --gradle-version 8.4
+        chmod +x gradlew
+
+    - name: Build with Gradle
+      run: cd android_wrapper && ./gradlew assembleDebug --stacktrace
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug-final
+        path: android_wrapper/app/build/outputs/apk/debug/app-debug.apk
