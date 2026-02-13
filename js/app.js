@@ -2554,117 +2554,139 @@ function resetCart(skipConfirm = false) {
 }
 
 // ========================================
-// PRINTING FUNCTIONS (Web Bluetooth API + RawBT Fallback)
+// PRINTING FUNCTIONS (USB OTG via WebUSB API)
 // ========================================
 
-// Variabel Global untuk Web Bluetooth
-let bluetoothDevice = null;
-let printCharacteristic = null;
+// Variabel Global untuk WebUSB Printer
+let usbPrinterDevice = null;
+let usbEndpointInfo = null;
 
-// Service UUIDs yang didukung (Dari Screenshot nRF Connect user: 49535343... transparency service)
-const PRINTER_SERVICES = [
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // VSC / RPP / Chinese Printers (Transparent)
-    '000018f0-0000-1000-8000-00805f9b34fb', // Standard Bluetooth Printer Service
-    'e7810a71-73ae-499d-8c15-faa9aef0c3f2'  // UUID Lain dari screenshot
-];
+/**
+ * Cek apakah browser mendukung WebUSB API
+ */
+function isWebUSBSupported() {
+    return !!navigator.usb;
+}
 
-// Fungsi untuk Connect ke Bluetooth Printer via Chrome
-async function connectToBluetoothPrinter() {
+/**
+ * Cari Bulk OUT endpoint pada USB device (untuk pengiriman data ke printer)
+ */
+function findPrinterEndpoint(device) {
+    if (!device.configuration) return null;
+    const interfaces = device.configuration.interfaces;
+    for (const iface of interfaces) {
+        const alternate = iface.alternates[0];
+        for (const ep of alternate.endpoints) {
+            if (ep.direction === 'out' && ep.type === 'bulk') {
+                return {
+                    interfaceNum: iface.interfaceNumber,
+                    endpointNum: ep.endpointNumber
+                };
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Connect ke Printer USB via OTG Cable (WebUSB API)
+ * Membutuhkan User Gesture (klik tombol) untuk requestDevice
+ */
+async function connectToUSBPrinter() {
+    // --- FAILSAFE 1: Cek dukungan browser ---
+    if (!isWebUSBSupported()) {
+        showAlert('❌ Browser tidak mendukung WebUSB. Gunakan Chrome/Edge versi terbaru.', 'danger');
+        return false;
+    }
+
     try {
-        console.log('🔵 Requesting Bluetooth Device (ALL DEVICES)...');
-        // METODE 2: SCAN SEMUA DEVICE (Lebih Agresif)
-        bluetoothDevice = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: [
-                '49535343-fe7d-4ae5-8fa9-9fafd205e455', // VSC
-                '000018f0-0000-1000-8000-00805f9b34fb', // Standard
-                'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Custom
-                '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-                '00001801-0000-1000-8000-00805f9b34fb'  // Generic Attribute
-            ]
-        });
+        console.log('🔌 Meminta akses USB Device...');
 
-        console.log('🔵 Connecting to GATT Server...');
-        const server = await bluetoothDevice.gatt.connect();
-        console.log('✅ Connected to:', bluetoothDevice.name);
+        // Request device — user akan memilih dari popup browser
+        usbPrinterDevice = await navigator.usb.requestDevice({ filters: [] });
 
-        // Cari Service dan Characteristic yang bisa ditulisi (Write)
-        printCharacteristic = null;
+        console.log(`🔌 Device dipilih: ${usbPrinterDevice.productName || 'Unknown'} (VID:${usbPrinterDevice.vendorId}, PID:${usbPrinterDevice.productId})`);
 
-        // 1. Coba Service VSC / Chinese (Prioritas dari screenshot)
-        try {
-            const service = await server.getPrimaryService('49535343-fe7d-4ae5-8fa9-9fafd205e455');
-            // Coba ambil characteristic umum untuk write (biasanya ...5034)
-            printCharacteristic = await service.getCharacteristic('49535034-fe7d-4ae5-8fa9-9fafd205e455');
-            console.log('✅ Found VSC Write Characteristic');
-        } catch (e) {
-            console.warn('⚠️ VSC Service not found or matching characteristic missing, trying next...');
+        // Open device
+        await usbPrinterDevice.open();
+        console.log('✅ USB Device Opened');
+
+        // Select configuration jika belum ada
+        if (usbPrinterDevice.configuration === null) {
+            await usbPrinterDevice.selectConfiguration(1);
+            console.log('✅ Configuration Selected');
         }
 
-        // 2. Coba Standard Printer Service (0x18F0)
-        if (!printCharacteristic) {
-            try {
-                const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                printCharacteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
-                console.log('✅ Found Standard Write Characteristic');
-            } catch (e) {
-                console.warn('⚠️ Standard Service not found, trying next...');
-            }
+        // --- FAILSAFE 2: Cari endpoint yang valid ---
+        usbEndpointInfo = findPrinterEndpoint(usbPrinterDevice);
+        if (!usbEndpointInfo) {
+            await usbPrinterDevice.close();
+            usbPrinterDevice = null;
+            showAlert('❌ Bukan perangkat printer! Tidak ditemukan Bulk OUT endpoint.', 'danger');
+            return false;
         }
 
-        // 3. Coba UUID e7810... (Dari screenshot)
-        if (!printCharacteristic) {
-            try {
-                const service = await server.getPrimaryService('e7810a71-73ae-499d-8c15-faa9aef0c3f2');
-                // Kita harus cari chr yang punya property WRITE
-                const characteristics = await service.getCharacteristics();
-                for (const c of characteristics) {
-                    if (c.properties.write || c.properties.writeWithoutResponse) {
-                        printCharacteristic = c;
-                        console.log('✅ Found custom Service Write Characteristic:', c.uuid);
-                        break;
-                    }
-                }
-            } catch (e) {
-                console.warn('⚠️ Custom Service e7810... not found or no write char.');
-            }
-        }
+        console.log(`✅ Endpoint: Interface #${usbEndpointInfo.interfaceNum}, EP #${usbEndpointInfo.endpointNum}`);
 
-        if (!printCharacteristic) {
-            throw new Error('Tidak ditemukan port untuk print (Characteristic Writable) di printer ini.');
-        }
+        // Claim interface
+        await usbPrinterDevice.claimInterface(usbEndpointInfo.interfaceNum);
+        console.log('✅ Interface Claimed! Printer USB SIAP.');
 
-        // Listener jika putus
-        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-        showAlert(`Terhubung ke ${bluetoothDevice.name}!`, 'success');
+        showAlert(`🖨️ Printer USB terhubung: ${usbPrinterDevice.productName || 'Printer'}`, 'success');
         return true;
 
     } catch (error) {
-        console.error('❌ Bluetooth Connection Error:', error);
-        showAlert('Gagal connect Bluetooth: ' + error.message, 'danger');
+        console.error('❌ USB Connection Error:', error);
+        usbPrinterDevice = null;
+        usbEndpointInfo = null;
+
+        // --- FAILSAFE 3: Error spesifik ---
+        if (error.name === 'NotFoundError') {
+            showAlert('⚠️ Tidak ada perangkat USB dipilih. Pastikan kabel OTG terhubung.', 'warning');
+        } else if (error.name === 'SecurityError') {
+            showAlert('❌ Akses USB ditolak oleh browser. Coba lagi atau cek izin.', 'danger');
+        } else if (error.name === 'NetworkError') {
+            showAlert('❌ Gagal membuka koneksi USB. Cabut dan pasang ulang kabel OTG.', 'danger');
+        } else {
+            showAlert('❌ Gagal menghubungkan printer USB: ' + error.message, 'danger');
+        }
         return false;
     }
 }
 
-function onDisconnected() {
-    console.log('❌ Bluetooth Disconnected');
-    bluetoothDevice = null;
-    printCharacteristic = null;
-    showAlert('Printer terputus', 'warning');
+/**
+ * Kirim byte data ke printer USB via transferOut
+ * Data dikirim dalam chunk agar buffer printer tidak overflow
+ */
+async function sendToUSBPrinter(data) {
+    if (!usbPrinterDevice || !usbEndpointInfo) {
+        throw new Error('Printer USB belum terhubung.');
+    }
+
+    const CHUNK_SIZE = 4096; // USB Bulk transfer bisa handle chunk lebih besar dari BLE
+    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+        const chunk = data.slice(i, i + CHUNK_SIZE);
+        await usbPrinterDevice.transferOut(usbEndpointInfo.endpointNum, chunk);
+    }
 }
 
-// Cek status koneksi ke RawBT Server (Fallback)
-async function cekStatusPrinter() {
-    try {
-        await fetch('http://localhost:40213/', {
-            method: 'GET',
-            mode: 'no-cors'
-        });
-        return true;
-    } catch (error) {
-        // Silent error log
-        return false;
+/**
+ * Disconnect printer USB
+ */
+async function disconnectUSBPrinter() {
+    if (usbPrinterDevice) {
+        try {
+            if (usbEndpointInfo) {
+                await usbPrinterDevice.releaseInterface(usbEndpointInfo.interfaceNum);
+            }
+            await usbPrinterDevice.close();
+        } catch (e) {
+            console.warn('USB disconnect warning:', e);
+        }
+        usbPrinterDevice = null;
+        usbEndpointInfo = null;
+        console.log('🔌 Printer USB terputus.');
+        showAlert('Printer USB terputus.', 'warning');
     }
 }
 
@@ -2676,9 +2698,15 @@ function formatStrukLine(left, right, width = 32) {
     return leftStr + ' '.repeat(spaces) + rightStr;
 }
 
-// Kirim struk ke printer
+// Kirim struk ke printer (USB OTG via WebUSB)
 async function cetakStruk(transaksi) {
     try {
+        // --- FAILSAFE: Cek dukungan WebUSB ---
+        if (!isWebUSBSupported()) {
+            showAlert('❌ Browser tidak mendukung WebUSB API. Gunakan Chrome Android versi 61+ atau Edge.', 'danger');
+            return false;
+        }
+
         // --- PREPARE DATA ---
         const paidAtDate = transaksi?.paidAtDate ? new Date(transaksi.paidAtDate) :
             (transaksi?.date ? new Date(transaksi.date) : new Date());
@@ -2694,20 +2722,21 @@ async function cetakStruk(transaksi) {
         const amountPaid = Number(transaksi.payment?.amountPaid) || total;
         const change = Number(transaksi.payment?.change) || Math.max(0, amountPaid - total);
 
-        // === ENCODING ESC/POS COMMANDS ===
+        // === ENCODING ESC/POS COMMANDS (Raw Text Mode) ===
         const encoder = new TextEncoder();
         const ESC = 0x1B;
         const GS = 0x1D;
 
-        const CMD_INIT = [ESC, 0x40];
-        const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];
-        const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];
-        const CMD_BOLD_ON = [ESC, 0x45, 0x01];
-        const CMD_BOLD_OFF = [ESC, 0x45, 0x00];
-        const CMD_CUT_PAPER = [GS, 0x56, 0x00];
+        const CMD_INIT = [ESC, 0x40];                    // Initialize printer
+        const CMD_ALIGN_CENTER = [ESC, 0x61, 0x01];      // Center alignment
+        const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];        // Left alignment
+        const CMD_BOLD_ON = [ESC, 0x45, 0x01];           // Bold ON
+        const CMD_BOLD_OFF = [ESC, 0x45, 0x00];          // Bold OFF
+        const CMD_FEED_3MM = [ESC, 0x64, 0x02];          // Feed 2 lines (~3mm, 1 line ≈ 1.5mm pada 58mm printer)
+        const CMD_CUT_PAPER = [GS, 0x56, 0x41, 0x00];   // Partial cut (GS V 65 0) — lebih aman dari full cut
 
-        // Format Byte Array
-        const comandosCompletos = new Uint8Array([
+        // === HEADER (Center-aligned) ===
+        const headerBytes = [
             ...CMD_INIT,
             ...CMD_ALIGN_CENTER,
             ...CMD_BOLD_ON,
@@ -2716,6 +2745,10 @@ async function cetakStruk(transaksi) {
             ...encoder.encode('Jl. Wolter Monginsidi No.KM.12\n'),
             ...encoder.encode('Genuksari, Kec. Genuk, Semarang\n'),
             ...encoder.encode('Telp: 0812-2259-9525\n'),
+        ];
+
+        // === INFO TRANSAKSI (Left-aligned) ===
+        const infoBytes = [
             ...CMD_ALIGN_LEFT,
             ...encoder.encode('================================\n'),
             ...encoder.encode(`No: ${txNo}\n`),
@@ -2723,117 +2756,93 @@ async function cetakStruk(transaksi) {
             ...(transaksi.cashier ? encoder.encode(`Kasir: ${transaksi.cashier}\n`) : []),
             ...(transaksi.staff ? encoder.encode(`Mekanik: ${transaksi.staff}\n`) : []),
             ...encoder.encode('================================\n'),
-        ]);
+        ];
 
+        // === ITEMS (Left-aligned, 32 char padded) ===
         const itemsBytes = [];
         (transaksi.items || []).forEach(it => {
-            const namaBarang = `${it.name} x${it.quantity}`;
-            const harga = `Rp ${formatNumber((Number(it.price) || 0) * (Number(it.quantity) || 0))}`;
+            const qty = Number(it.quantity) || 0;
+            const price = Number(it.price) || 0;
+            const namaBarang = `${it.name} x${qty}`;
+            const harga = `Rp ${formatNumber(price * qty)}`;
             const maxNamaLen = 32 - harga.length - 1;
             const namaTerpotong = namaBarang.length > maxNamaLen
-                ? namaBarang.substring(0, maxNamaLen) + '...'
+                ? namaBarang.substring(0, maxNamaLen)
                 : namaBarang;
             const line = formatStrukLine(namaTerpotong, harga, 32) + '\n';
             itemsBytes.push(...encoder.encode(line));
         });
 
+        // === TOTALS (Left-aligned, 32 char padded) ===
         const totalBytes = [
             ...encoder.encode('================================\n'),
             ...encoder.encode(formatStrukLine('Sub Total', `Rp ${formatNumber(subtotal)}`, 32) + '\n'),
-            ...encoder.encode(formatStrukLine('Potongan', `-Rp ${formatNumber(discount)}`, 32) + '\n'),
-            ...encoder.encode(formatStrukLine(`Pajak (${taxPercent}%)`, `Rp ${formatNumber(taxAmount)}`, 32) + '\n'),
+            ...(discount > 0 ? encoder.encode(formatStrukLine('Potongan', `-Rp ${formatNumber(discount)}`, 32) + '\n') : []),
+            ...(taxPercent > 0 ? encoder.encode(formatStrukLine(`Pajak (${taxPercent}%)`, `Rp ${formatNumber(taxAmount)}`, 32) + '\n') : []),
+            ...CMD_BOLD_ON,
             ...encoder.encode(formatStrukLine('TOTAL', `Rp ${formatNumber(total)}`, 32) + '\n'),
+            ...CMD_BOLD_OFF,
             ...encoder.encode(formatStrukLine('Dibayar', `Rp ${formatNumber(amountPaid)}`, 32) + '\n'),
             ...encoder.encode(formatStrukLine('Kembali', `Rp ${formatNumber(change)}`, 32) + '\n'),
             ...encoder.encode('================================\n'),
         ];
 
+        // === FOOTER (Center-aligned) + CUT tepat 3mm sesudah teks terakhir ===
         const footerBytes = [
             ...CMD_ALIGN_CENTER,
             ...encoder.encode('YOUR TIRE SOLUTION\n'),
             ...encoder.encode('TERIMA KASIH ATAS KUNJUNGAN ANDA\n'),
             ...encoder.encode('Barang yang sudah dibeli\n'),
-            ...encoder.encode('tidak dapat ditukar/dikembalikan\n'),
-            ...encoder.encode('\n\n\n'),
-            ...CMD_CUT_PAPER
+            ...encoder.encode('tidak dapat ditukar/dikembalikan'),  // TANPA \n — langsung feed
+            ...CMD_FEED_3MM,                                        // Feed tepat ~3mm
+            ...CMD_CUT_PAPER                                        // Potong kertas
         ];
 
+        // === GABUNGKAN SEMUA BYTES ===
         const allBytes = new Uint8Array([
-            ...comandosCompletos,
+            ...headerBytes,
+            ...infoBytes,
             ...itemsBytes,
             ...totalBytes,
             ...footerBytes
         ]);
 
-        // === STRATEGI PENCETAKAN (PRIORITAS) ===
+        // === STRATEGI PENCETAKAN (USB OTG PRIORITAS UTAMA) ===
 
-        // 1. WEB BLUETOOTH API (CHROME DIRECT) - Paling Cepat & Stabil
-        if (bluetoothDevice && bluetoothDevice.gatt.connected && printCharacteristic) {
-            console.log('🔵 Printing via Web Bluetooth...');
-
-            // Tulis data dalam chunk (max 512 bytes per chunk untuk aman)
-            const CHUNK_SIZE = 100; // Kecilkan chunk size untuk kompatibilitas BLE
-            for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
-                const chunk = allBytes.slice(i, i + CHUNK_SIZE);
-                await printCharacteristic.writeValue(chunk);
-                // Delay sedikit antar chunk biar buffer printer gak overflow
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            showAlert('Struk terkirim ke printer (BLE)', 'success');
-            return true;
-        }
-
-        // Jika belum connect, tawarkan connect (User Gesture Required)
-        // Kita coba connect SEKARANG jika user mengklik tombol bayar yang mentrigger ini
-        if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
-            const wantToConnect = confirm("Printer belum terhubung. Mau hubungkan ke Printer Bluetooth sekarang?");
-            if (wantToConnect) {
-                const connected = await connectToBluetoothPrinter();
-                if (connected) {
-                    // Rekursif panggil diri sendiri setelah connect
-                    return cetakStruk(transaksi);
-                }
+        // 1. USB OTG (WebUSB) — PRIORITAS UTAMA
+        if (usbPrinterDevice && usbEndpointInfo) {
+            try {
+                console.log('🔌 Printing via USB OTG...');
+                await sendToUSBPrinter(allBytes);
+                showAlert('🖨️ Struk terkirim via USB!', 'success');
+                return true;
+            } catch (usbError) {
+                console.error('❌ USB print error:', usbError);
+                // Printer mungkin disconnect, reset state
+                usbPrinterDevice = null;
+                usbEndpointInfo = null;
+                showAlert('❌ Gagal kirim ke printer USB. Kabel mungkin terputus.', 'danger');
+                return false;
             }
         }
 
-        // 2. ANDROID NATIVE HYBRID (Jika di dalam APK)
-        if (window.Android && window.Android.cetakStruk) {
-            console.log('📱 Printing via Android Native...');
-            let binaryString = '';
-            for (let i = 0; i < allBytes.length; i++) {
-                binaryString += String.fromCharCode(allBytes[i]);
+        // 2. Jika belum connect, tawarkan connect (User Gesture Required)
+        const wantToConnect = confirm('Printer USB belum terhubung.\n\nPastikan kabel OTG sudah terpasang, lalu klik OK untuk menghubungkan.');
+        if (wantToConnect) {
+            const connected = await connectToUSBPrinter();
+            if (connected) {
+                // Rekursif panggil setelah connect berhasil
+                return cetakStruk(transaksi);
             }
-            window.Android.cetakStruk(btoa(binaryString));
-            showAlert('Mengirim ke Printer Native...', 'success');
-            return true;
         }
 
-        // 3. RAWBT FALLBACK (Jika ada aplikasi RawBT terinstall)
-        const printerReady = await cekStatusPrinter();
-        if (printerReady) {
-            console.log('🌍 Printing via RawBT Localhost...');
-            let binaryString = '';
-            for (let i = 0; i < allBytes.length; i++) {
-                binaryString += String.fromCharCode(allBytes[i]);
-            }
-            const base64Data = btoa(binaryString);
-            await fetch('http://localhost:40213/print', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: base64Data })
-            });
-            showAlert('Struk dicetak via RawBT', 'success');
-            return true;
-        }
-
-        // Gagal semua
-        showAlert('Tidak ada printer terhubung (BLE / Native / RawBT)', 'warning');
+        // Gagal
+        showAlert('⚠️ Cetak dibatalkan. Hubungkan printer USB terlebih dahulu.', 'warning');
         return false;
 
     } catch (error) {
         console.error('❌ Error cetakStruk:', error);
-        showAlert('Error Print: ' + error.message, 'danger');
+        showAlert('❌ Error Print: ' + error.message, 'danger');
         return false;
     }
 }

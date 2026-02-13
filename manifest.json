@@ -1,22 +1,26 @@
 {
-  "name": "DEWA BAN",
+  "name": "DEWA BAN - Point of Sale",
   "short_name": "DEWA BAN",
-  "id": "/dewa-ban-v53/",
+  "description": "Sistem Kasir DEWA BAN — Cetak struk via USB OTG",
+  "id": "/dewa-ban-v2-usb/",
   "start_url": "./index.html",
   "scope": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#dc3545",
   "icons": [
     {
       "src": "img/logoapkbaru.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "img/logoapkbaru.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

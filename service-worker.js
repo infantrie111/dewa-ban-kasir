@@ -1,4 +1,9 @@
-const CACHE_NAME = 'dewa-ban-v55-monthly-report'; // v55 - Monthly Report Download & Responsive Buttons
+// ========================================
+// DEWA BAN POS — Service Worker v2.0.0-usb
+// USB OTG Architecture — Semua cache Bluetooth/RawBT dibuang
+// ========================================
+
+const CACHE_NAME = 'dewa-ban-v2.0.0-usb';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -10,49 +15,57 @@ const ASSETS_TO_CACHE = [
   './img/logoapkbaru.png'
 ];
 
+// ── INSTALL ─────────────────────────────
+// skipWaiting() agar SW baru langsung aktif tanpa menunggu tab ditutup
 self.addEventListener('install', (event) => {
-  // Force the waiting service worker to become the active service worker.
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
 });
 
+// ── ACTIVATE ────────────────────────────
+// Hapus SEMUA cache lama (termasuk v55-monthly-report, dll)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+          .map((key) => {
+            console.log(`[SW] 🗑️ Purging old cache: ${key}`);
+            return caches.delete(key);
+          })
       )
     )
   );
-  // Tell the active service worker to take control of the page immediately.
+  // Ambil kontrol semua tab yang terbuka (tanpa perlu reload manual)
   self.clients.claim();
 });
 
+// ── FETCH ───────────────────────────────
+// Strategi:
+//   App Shell (navigate / index.html / app.js / style.css) → Network First, fallback Cache
+//   Aset lain same-origin → Cache First, fallback Network
+//   Cross-origin (Firebase, CDN, dsb) → Network Only (tidak di-cache)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
   const url = new URL(request.url);
-
-  // JANGAN cache request ke RawBT Printer Server (localhost:40213)
-  if (url.hostname === 'localhost' && url.port === '40213') {
-    event.respondWith(fetch(request));
-    return;
-  }
-
   const isSameOrigin = url.origin === self.location.origin;
-  const path = isSameOrigin ? url.pathname.replace(/\/+$/, '') : '';
-  const isAppShell = isSameOrigin && (
+
+  // Jangan cache cross-origin requests (Firebase, CDN Bootstrap, dll)
+  if (!isSameOrigin) return;
+
+  const path = url.pathname.replace(/\/+$/, '');
+  const isAppShell =
     request.mode === 'navigate' ||
     path.endsWith('/index.html') ||
-    path.endsWith('/js/app.js')
-  );
+    path.endsWith('/js/app.js') ||
+    path.endsWith('/css/style.css');
 
   event.respondWith(
     (async () => {
+      // ── APP SHELL: Network First ──────────
       if (isAppShell) {
         try {
           const networkResponse = await fetch(request);
@@ -67,6 +80,7 @@ self.addEventListener('fetch', (event) => {
         }
       }
 
+      // ── ASET LAIN: Cache First ────────────
       const cached = await caches.match(request);
       if (cached) return cached;
 
@@ -79,6 +93,7 @@ self.addEventListener('fetch', (event) => {
         cache.put(request, response.clone());
         return response;
       } catch (_) {
+        // Offline dan tidak ada cache — tampilkan index.html sebagai fallback
         return caches.match('./index.html');
       }
     })()
