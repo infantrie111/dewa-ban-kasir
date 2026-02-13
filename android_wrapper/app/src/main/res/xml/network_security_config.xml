@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Izinkan cleartext (HTTP) untuk development/local testing -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Secara spesifik izinkan domain GitHub Pages & Firebase -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">infantrie111.github.io</domain>
+        <domain includeSubdomains="true">github.io</domain>
+        <domain includeSubdomains="true">firebaseio.com</domain>
+        <domain includeSubdomains="true">firebasedatabase.app</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
