@@ -1,4 +1,4 @@
-name: Android Final V4
+name: Android Final V4 (Auto Wrapper)
 
 on:
   push:
@@ -17,6 +17,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: gradle
+
+    # INI BARIS AJAIBNYA (GENERATE GRADLEW DI SERVER):
+    - name: Generate Gradle Wrapper
+      run: cd android_wrapper && gradle wrapper
 
     - name: Grant execute permission for gradlew
       run: chmod +x android_wrapper/gradlew
