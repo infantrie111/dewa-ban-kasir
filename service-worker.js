@@ -1,9 +1,9 @@
 // ========================================
-// DEWA BAN POS — Service Worker v2.2.0-usb-final
-// USB OTG Architecture — Semua cache Bluetooth/RawBT dibuang
+// DEWA BAN POS — Service Worker v2.3.0-universal-usb-fix
+// USB OTG Architecture — Universal & Aggressive Mode
 // ========================================
 
-const CACHE_NAME = 'dewa-ban-v2.2.0-usb-final';
+const CACHE_NAME = 'dewa-ban-v2.3.0-universal-usb-fix';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

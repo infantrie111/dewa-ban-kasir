@@ -824,7 +824,8 @@ function reprintTransaction(transactionNo) {
         showAlert('Transaksi tidak ditemukan', 'warning');
         return;
     }
-    showReceipt(trx);
+    // v2.3.0: Cetak ulang via WebUSB (Raw ESC/POS) — bukan lagi window.print()
+    cetakStruk(trx);
 }
 
 function deleteTransaction(transactionNo) {
@@ -2555,11 +2556,53 @@ function resetCart(skipConfirm = false) {
 
 // ========================================
 // PRINTING FUNCTIONS (USB OTG via WebUSB API)
+// v2.3.0 — Universal & Aggressive Mode
+// Kompatibel: Windows Laptop + Android HP
 // ========================================
 
 // Variabel Global untuk WebUSB Printer
 let usbPrinterDevice = null;
 let usbEndpointInfo = null;
+
+/**
+ * Update UI status koneksi USB (tombol header, modal Settings, status bar)
+ */
+function updateUSBStatusUI(connected, printerName = '') {
+    const headerBtn = document.getElementById('btn-usb-header');
+    const connectBtn = document.getElementById('btn-connect-usb');
+    const disconnectBtn = document.getElementById('btn-disconnect-usb');
+    const statusBar = document.getElementById('usb-status-bar');
+
+    if (connected) {
+        // Header button — hijau solid
+        if (headerBtn) {
+            headerBtn.style.border = '1px solid #198754';
+            headerBtn.style.color = '#fff';
+            headerBtn.style.backgroundColor = '#198754';
+            headerBtn.title = `Printer: ${printerName}`;
+        }
+        // Settings modal
+        if (connectBtn) connectBtn.classList.add('d-none');
+        if (disconnectBtn) disconnectBtn.classList.remove('d-none');
+        if (statusBar) {
+            statusBar.innerHTML = `<i class="bi bi-check-circle-fill me-1 text-success"></i><strong class="text-success">${printerName || 'Printer'}</strong> terhubung`;
+        }
+    } else {
+        // Header button — outline hijau
+        if (headerBtn) {
+            headerBtn.style.border = '1px solid #198754';
+            headerBtn.style.color = '#198754';
+            headerBtn.style.backgroundColor = 'transparent';
+            headerBtn.title = 'Hubungkan Printer USB';
+        }
+        // Settings modal
+        if (connectBtn) connectBtn.classList.remove('d-none');
+        if (disconnectBtn) disconnectBtn.classList.add('d-none');
+        if (statusBar) {
+            statusBar.innerHTML = '<i class="bi bi-usb-symbol me-1"></i>Printer belum terhubung';
+        }
+    }
+}
 
 /**
  * Cek apakah browser mendukung WebUSB API
@@ -2569,28 +2612,105 @@ function isWebUSBSupported() {
 }
 
 /**
- * Cari Bulk OUT endpoint pada USB device (untuk pengiriman data ke printer)
+ * AGGRESSIVE: Cari Bulk OUT endpoint pada USB device
+ * Scan SEMUA interface dan SEMUA alternate settings
+ * Return: { interfaceNum, endpointNum, fallbacks: [...] } atau null
  */
 function findPrinterEndpoint(device) {
-    if (!device.configuration) return null;
+    if (!device.configuration) {
+        console.warn('⚠️ findPrinterEndpoint: No configuration on device');
+        return null;
+    }
+
+    const results = [];
     const interfaces = device.configuration.interfaces;
+
     for (const iface of interfaces) {
-        const alternate = iface.alternates[0];
-        for (const ep of alternate.endpoints) {
-            if (ep.direction === 'out' && ep.type === 'bulk') {
-                return {
-                    interfaceNum: iface.interfaceNumber,
-                    endpointNum: ep.endpointNumber
-                };
+        for (const alt of iface.alternates) {
+            for (const ep of alt.endpoints) {
+                if (ep.direction === 'out') {
+                    results.push({
+                        interfaceNum: iface.interfaceNumber,
+                        endpointNum: ep.endpointNumber,
+                        type: ep.type  // 'bulk', 'interrupt', etc.
+                    });
+                    console.log(`📡 Found OUT endpoint: IF#${iface.interfaceNumber} EP#${ep.endpointNumber} type=${ep.type}`);
+                }
             }
         }
     }
+
+    // Prioritas: Bulk OUT pertama
+    const bulkOut = results.find(r => r.type === 'bulk');
+    if (bulkOut) {
+        return {
+            interfaceNum: bulkOut.interfaceNum,
+            endpointNum: bulkOut.endpointNum,
+            fallbacks: results.filter(r => r !== bulkOut)
+        };
+    }
+
+    // Fallback: Ambil ANY out endpoint (interrupt, dsb)
+    if (results.length > 0) {
+        const primary = results[0];
+        console.warn(`⚠️ No Bulk OUT found, using ${primary.type} EP#${primary.endpointNum} as fallback`);
+        return {
+            interfaceNum: primary.interfaceNum,
+            endpointNum: primary.endpointNum,
+            fallbacks: results.slice(1)
+        };
+    }
+
     return null;
 }
 
 /**
- * Connect ke Printer USB via OTG Cable (WebUSB API)
- * Membutuhkan User Gesture (klik tombol) untuk requestDevice
+ * AGGRESSIVE: Coba claim interface dengan multiple strategy
+ * Strategy 1: Claim interface yang ditemukan dari endpoint scan
+ * Strategy 2: Force claim interface 0 (Windows sering butuh ini)
+ * Strategy 3: Coba selectAlternateInterface jika claim gagal
+ */
+async function aggressiveClaimInterface(device, targetInterface) {
+    const strategies = [
+        { name: 'Target Interface', ifNum: targetInterface },
+        { name: 'Force Interface 0', ifNum: 0 },
+        { name: 'Force Interface 1', ifNum: 1 }
+    ];
+
+    // Deduplicate
+    const seen = new Set();
+    const uniqueStrategies = strategies.filter(s => {
+        if (seen.has(s.ifNum)) return false;
+        seen.add(s.ifNum);
+        return true;
+    });
+
+    for (const strategy of uniqueStrategies) {
+        try {
+            console.log(`🔧 Trying claimInterface: ${strategy.name} (IF#${strategy.ifNum})...`);
+            await device.claimInterface(strategy.ifNum);
+            console.log(`✅ claimInterface SUCCESS: ${strategy.name} (IF#${strategy.ifNum})`);
+            return strategy.ifNum;
+        } catch (err) {
+            console.warn(`⚠️ claimInterface FAILED for ${strategy.name} (IF#${strategy.ifNum}):`, err.message);
+            // Pada Windows, coba selectAlternateInterface sebelum claim ulang
+            try {
+                await device.selectAlternateInterface(strategy.ifNum, 0);
+                await device.claimInterface(strategy.ifNum);
+                console.log(`✅ claimInterface SUCCESS via selectAlternateInterface: IF#${strategy.ifNum}`);
+                return strategy.ifNum;
+            } catch (_) {
+                // Lanjut ke strategy berikutnya
+            }
+        }
+    }
+
+    throw new Error('Gagal claim interface pada semua strategy. Coba cabut dan pasang ulang kabel USB.');
+}
+
+/**
+ * UNIVERSAL: Connect ke Printer USB via OTG Cable (WebUSB API)
+ * v2.3.0 — Aggressive mode untuk Windows + Android
  */
 async function connectToUSBPrinter() {
     // --- FAILSAFE 1: Cek dukungan browser ---
@@ -2613,26 +2733,62 @@ async function connectToUSBPrinter() {
 
         // Select configuration jika belum ada
         if (usbPrinterDevice.configuration === null) {
-            await usbPrinterDevice.selectConfiguration(1);
-            console.log('✅ Configuration Selected');
+            try {
+                await usbPrinterDevice.selectConfiguration(1);
+                console.log('✅ Configuration Selected');
+            } catch (cfgErr) {
+                console.warn('⚠️ selectConfiguration(1) failed, continuing...', cfgErr.message);
+            }
         }
 
-        // --- FAILSAFE 2: Cari endpoint yang valid ---
+        // --- STEP 1: Cari endpoint via auto-scan ---
         usbEndpointInfo = findPrinterEndpoint(usbPrinterDevice);
-        if (!usbEndpointInfo) {
-            await usbPrinterDevice.close();
-            usbPrinterDevice = null;
-            showAlert('❌ Bukan perangkat printer! Tidak ditemukan Bulk OUT endpoint.', 'danger');
-            return false;
+
+        if (usbEndpointInfo) {
+            console.log(`✅ Auto-detected Endpoint: IF#${usbEndpointInfo.interfaceNum}, EP#${usbEndpointInfo.endpointNum}`);
+        } else {
+            // --- STEP 2: FALLBACK — Paksa endpoint default printer thermal ---
+            console.warn('⚠️ Auto-detect endpoint GAGAL. Menggunakan fallback default...');
+            usbEndpointInfo = {
+                interfaceNum: 0,
+                endpointNum: 1,  // Endpoint 1 = default printer thermal 58mm/80mm
+                fallbacks: [{ interfaceNum: 0, endpointNum: 2 }, { interfaceNum: 0, endpointNum: 3 }]
+            };
+            console.log(`🔧 Fallback Endpoint: IF#0, EP#1 (dengan fallback EP#2, EP#3)`);
         }
 
-        console.log(`✅ Endpoint: Interface #${usbEndpointInfo.interfaceNum}, EP #${usbEndpointInfo.endpointNum}`);
+        // --- STEP 3: AGGRESSIVE Claim Interface ---
+        const claimedInterface = await aggressiveClaimInterface(usbPrinterDevice, usbEndpointInfo.interfaceNum);
+        usbEndpointInfo.interfaceNum = claimedInterface;
+        console.log(`✅ Final Claimed Interface: IF#${claimedInterface}`);
 
-        // Claim interface
-        await usbPrinterDevice.claimInterface(usbEndpointInfo.interfaceNum);
-        console.log('✅ Interface Claimed! Printer USB SIAP.');
+        // --- STEP 4: Wake-up printer dengan ESC @ (Initialize) ---
+        try {
+            const wakeUpCmd = new Uint8Array([0x1B, 0x40]); // ESC @ = Initialize/Reset printer
+            await usbPrinterDevice.transferOut(usbEndpointInfo.endpointNum, wakeUpCmd);
+            console.log('✅ Wake-up ESC @ sent! Printer terjaga.');
+        } catch (wakeErr) {
+            console.warn('⚠️ Wake-up ESC @ gagal di EP#' + usbEndpointInfo.endpointNum + ':', wakeErr.message);
 
-        showAlert(`🖨️ Printer USB terhubung: ${usbPrinterDevice.productName || 'Printer'}`, 'success');
+            // Coba fallback endpoint untuk wake-up
+            if (usbEndpointInfo.fallbacks && usbEndpointInfo.fallbacks.length > 0) {
+                for (const fb of usbEndpointInfo.fallbacks) {
+                    try {
+                        const wakeUpCmd2 = new Uint8Array([0x1B, 0x40]);
+                        await usbPrinterDevice.transferOut(fb.endpointNum, wakeUpCmd2);
+                        console.log(`✅ Wake-up berhasil via fallback EP#${fb.endpointNum}!`);
+                        // Switch ke endpoint yang berhasil
+                        usbEndpointInfo.endpointNum = fb.endpointNum;
+                        break;
+                    } catch (_) {
+                        console.warn(`⚠️ Fallback EP#${fb.endpointNum} juga gagal`);
+                    }
+                }
+            }
+        }
+
+        showAlert(`🖨️ Printer USB terhubung: ${usbPrinterDevice.productName || 'Printer'} (EP#${usbEndpointInfo.endpointNum})`, 'success');
+        updateUSBStatusUI(true, usbPrinterDevice.productName || 'Printer USB');
         return true;
 
     } catch (error) {
@@ -2640,34 +2796,74 @@ async function connectToUSBPrinter() {
         usbPrinterDevice = null;
         usbEndpointInfo = null;
 
-        // --- FAILSAFE 3: Error spesifik ---
+        // --- Error handling spesifik ---
         if (error.name === 'NotFoundError') {
             showAlert('⚠️ Tidak ada perangkat USB dipilih. Pastikan kabel OTG terhubung.', 'warning');
         } else if (error.name === 'SecurityError') {
             showAlert('❌ Akses USB ditolak oleh browser. Coba lagi atau cek izin.', 'danger');
         } else if (error.name === 'NetworkError') {
-            showAlert('❌ Gagal membuka koneksi USB. Cabut dan pasang ulang kabel OTG.', 'danger');
+            showAlert('❌ Gagal membuka koneksi USB. Cabut dan pasang ulang kabel OTG, lalu coba lagi.', 'danger');
         } else {
             showAlert('❌ Gagal menghubungkan printer USB: ' + error.message, 'danger');
         }
+        updateUSBStatusUI(false);
         return false;
     }
 }
 
 /**
- * Kirim byte data ke printer USB via transferOut
- * Data dikirim dalam chunk agar buffer printer tidak overflow
+ * UNIVERSAL: Kirim byte data ke printer USB via transferOut
+ * v2.3.0 — Dengan wake-up command, chunking, dan retry fallback endpoint
  */
 async function sendToUSBPrinter(data) {
     if (!usbPrinterDevice || !usbEndpointInfo) {
         throw new Error('Printer USB belum terhubung.');
     }
 
-    const CHUNK_SIZE = 4096; // USB Bulk transfer bisa handle chunk lebih besar dari BLE
-    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-        const chunk = data.slice(i, i + CHUNK_SIZE);
-        await usbPrinterDevice.transferOut(usbEndpointInfo.endpointNum, chunk);
+    // Prepend wake-up ESC @ sebelum setiap payload untuk memastikan printer awake
+    const wakeUp = new Uint8Array([0x1B, 0x40]);
+    const fullPayload = new Uint8Array(wakeUp.length + data.length);
+    fullPayload.set(wakeUp, 0);
+    fullPayload.set(data, wakeUp.length);
+
+    const CHUNK_SIZE = 4096;
+
+    // Attempt 1: Kirim ke endpoint utama
+    try {
+        for (let i = 0; i < fullPayload.length; i += CHUNK_SIZE) {
+            const chunk = fullPayload.slice(i, i + CHUNK_SIZE);
+            await usbPrinterDevice.transferOut(usbEndpointInfo.endpointNum, chunk);
+        }
+        console.log(`✅ Data terkirim via EP#${usbEndpointInfo.endpointNum} (${fullPayload.length} bytes)`);
+        return;
+    } catch (primaryErr) {
+        console.warn(`⚠️ transferOut EP#${usbEndpointInfo.endpointNum} gagal:`, primaryErr.message);
     }
+
+    // Attempt 2: Retry dengan fallback endpoints
+    const fallbacks = usbEndpointInfo.fallbacks || [
+        { endpointNum: 1 }, { endpointNum: 2 }, { endpointNum: 3 }
+    ];
+
+    for (const fb of fallbacks) {
+        if (fb.endpointNum === usbEndpointInfo.endpointNum) continue; // Skip yang sudah gagal
+        try {
+            console.log(`🔄 Retry via fallback EP#${fb.endpointNum}...`);
+            for (let i = 0; i < fullPayload.length; i += CHUNK_SIZE) {
+                const chunk = fullPayload.slice(i, i + CHUNK_SIZE);
+                await usbPrinterDevice.transferOut(fb.endpointNum, chunk);
+            }
+            // Switch ke endpoint yang berhasil untuk penggunaan selanjutnya
+            console.log(`✅ Data terkirim via fallback EP#${fb.endpointNum}! Switching default endpoint.`);
+            usbEndpointInfo.endpointNum = fb.endpointNum;
+            return;
+        } catch (fbErr) {
+            console.warn(`⚠️ Fallback EP#${fb.endpointNum} juga gagal:`, fbErr.message);
+        }
+    }
+
+    // Semua endpoint gagal
+    throw new Error('Semua endpoint gagal mengirim data. Coba cabut dan pasang ulang kabel USB.');
 }
 
 /**
@@ -2687,6 +2883,7 @@ async function disconnectUSBPrinter() {
         usbEndpointInfo = null;
         console.log('🔌 Printer USB terputus.');
         showAlert('Printer USB terputus.', 'warning');
+        updateUSBStatusUI(false);
     }
 }
 
@@ -2827,6 +3024,7 @@ async function cetakStruk(transaksi) {
                 // Printer mungkin disconnect, reset state
                 usbPrinterDevice = null;
                 usbEndpointInfo = null;
+                updateUSBStatusUI(false);
                 showAlert('❌ Gagal kirim ke printer USB. Kabel mungkin terputus.', 'danger');
                 return false;
             }
