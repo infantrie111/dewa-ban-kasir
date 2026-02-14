@@ -2555,8 +2555,9 @@ function resetCart(skipConfirm = false) {
 }
 
 // ========================================
-// PRINTING FUNCTIONS (USB OTG via WebUSB API)
-// v2.3.0 — Universal & Aggressive Mode
+// PRINTING FUNCTIONS — Smart Auto-Routing
+// v2.9.0-auto-routing
+// USB OTG (Priority 1) → RawBT Intent (Fallback)
 // Kompatibel: Windows Laptop + Android HP
 // ========================================
 
@@ -2887,6 +2888,38 @@ async function disconnectUSBPrinter() {
     }
 }
 
+/**
+ * Convert Uint8Array to Base64 string
+ * @param {Uint8Array} bytes - ESC/POS byte array
+ * @returns {string} Base64 encoded string
+ */
+function uint8ArrayToBase64(bytes) {
+    let binary = '';
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+/**
+ * Send ESC/POS data to RawBT Intent (Bluetooth Printer)
+ * Fallback method when USB is not available
+ * @param {Uint8Array} bytes - ESC/POS byte array
+ */
+function sendToRawBT(bytes) {
+    try {
+        const base64Data = uint8ArrayToBase64(bytes);
+        const intentURL = `intent://...#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;action=ru.a402d.rawbtprinter.PARSE;S.base64=${base64Data};end;`;
+
+        console.log('📲 Redirecting to RawBT Intent...');
+        window.location.href = intentURL;
+    } catch (error) {
+        console.error('❌ RawBT Intent error:', error);
+        showAlert('❌ Gagal mengirim ke printer Bluetooth: ' + error.message, 'danger');
+    }
+}
+
 // Fungsi untuk format teks struk dengan padding yang benar (32 karakter)
 function formatStrukLine(left, right, width = 32) {
     const leftStr = String(left);
@@ -2895,15 +2928,10 @@ function formatStrukLine(left, right, width = 32) {
     return leftStr + ' '.repeat(spaces) + rightStr;
 }
 
-// Kirim struk ke printer (USB OTG via WebUSB)
+// Kirim struk ke printer (Smart Auto-Routing: USB OTG → RawBT Intent)
+// v2.9.0-auto-routing — Silent fallback, no user prompts
 async function cetakStruk(transaksi) {
     try {
-        // --- FAILSAFE: Cek dukungan WebUSB ---
-        if (!isWebUSBSupported()) {
-            showAlert('❌ Browser tidak mendukung WebUSB API. Gunakan Chrome Android versi 61+ atau Edge.', 'danger');
-            return false;
-        }
-
         // --- PREPARE DATA ---
         const paidAtDate = transaksi?.paidAtDate ? new Date(transaksi.paidAtDate) :
             (transaksi?.date ? new Date(transaksi.date) : new Date());
@@ -3010,39 +3038,36 @@ async function cetakStruk(transaksi) {
             ...footerBytes
         ]);
 
-        // === STRATEGI PENCETAKAN (USB OTG PRIORITAS UTAMA) ===
+        // ========================================
+        // SMART AUTO-ROUTING LOGIC
+        // ========================================
 
-        // 1. USB OTG (WebUSB) — PRIORITAS UTAMA
+        // Prioritas 1: USB OTG (jika sudah terkoneksi)
         if (usbPrinterDevice && usbEndpointInfo) {
             try {
-                console.log('🔌 Printing via USB OTG...');
+                console.log('🔌 Attempting USB print...');
                 await sendToUSBPrinter(allBytes);
                 showAlert('🖨️ Struk terkirim via USB!', 'success');
                 return true;
             } catch (usbError) {
-                console.error('❌ USB print error:', usbError);
-                // Printer mungkin disconnect, reset state
+                // USB gagal (kabel tercabut, device error, dll)
+                console.warn('⚠️ USB print failed, switching to RawBT...', usbError);
+
+                // Reset USB state
                 usbPrinterDevice = null;
                 usbEndpointInfo = null;
                 updateUSBStatusUI(false);
-                showAlert('❌ Gagal kirim ke printer USB. Kabel mungkin terputus.', 'danger');
-                return false;
+
+                // Fallback ke RawBT secara silent
+                sendToRawBT(allBytes);
+                return true;
             }
         }
 
-        // 2. Jika belum connect, tawarkan connect (User Gesture Required)
-        const wantToConnect = confirm('Printer USB belum terhubung.\n\nPastikan kabel OTG sudah terpasang, lalu klik OK untuk menghubungkan.');
-        if (wantToConnect) {
-            const connected = await connectToUSBPrinter();
-            if (connected) {
-                // Rekursif panggil setelah connect berhasil
-                return cetakStruk(transaksi);
-            }
-        }
-
-        // Gagal
-        showAlert('⚠️ Cetak dibatalkan. Hubungkan printer USB terlebih dahulu.', 'warning');
-        return false;
+        // Prioritas 2: Jika USB tidak terkoneksi sejak awal, langsung gunakan RawBT
+        console.log('📲 USB not connected, using RawBT Intent...');
+        sendToRawBT(allBytes);
+        return true;
 
     } catch (error) {
         console.error('❌ Error cetakStruk:', error);
