@@ -2732,16 +2732,20 @@ async function cetakStruk(transaksi) {
         const CMD_ALIGN_LEFT = [ESC, 0x61, 0x00];        // Left alignment
         const CMD_BOLD_ON = [ESC, 0x45, 0x01];           // Bold ON
         const CMD_BOLD_OFF = [ESC, 0x45, 0x00];          // Bold OFF
-        const CMD_FEED_3MM = [ESC, 0x64, 0x02];          // Feed 2 lines (~3mm, 1 line ≈ 1.5mm pada 58mm printer)
+        const CMD_ITALIC_ON = [ESC, 0x34];               // Italic ON (ESC 4)
+        const CMD_ITALIC_OFF = [ESC, 0x35];              // Italic OFF (ESC 5)
+        const CMD_FEED_5 = [ESC, 0x64, 0x05];            // Feed 5 lines agar teks kebijakan pengembalian melewati pisau
         const CMD_CUT_PAPER = [GS, 0x56, 0x41, 0x00];   // Partial cut (GS V 65 0) — lebih aman dari full cut
 
-        // === HEADER (Center-aligned) ===
+        // === HEADER (Center-aligned, DEWA BAN = Bold+Italic) ===
         const headerBytes = [
             ...CMD_INIT,
             ...CMD_ALIGN_CENTER,
             ...CMD_BOLD_ON,
+            ...CMD_ITALIC_ON,
             ...encoder.encode('DEWA BAN\n'),
-            ...CMD_BOLD_OFF,
+            ...CMD_BOLD_OFF,                                // Bold OFF segera setelah judul
+            ...CMD_ITALIC_OFF,                              // Italic OFF segera setelah judul
             ...encoder.encode('Jl. Wolter Monginsidi No.KM.12\n'),
             ...encoder.encode('Genuksari, Kec. Genuk, Semarang\n'),
             ...encoder.encode('Telp: 0812-2259-9525\n'),
@@ -2787,15 +2791,17 @@ async function cetakStruk(transaksi) {
             ...encoder.encode('================================\n'),
         ];
 
-        // === FOOTER (Center-aligned) + CUT tepat 3mm sesudah teks terakhir ===
+        // === FOOTER (Center-aligned) + CUT setelah feed 5 baris ===
         const footerBytes = [
             ...CMD_ALIGN_CENTER,
-            ...encoder.encode('YOUR TIRE SOLUTION\n'),
+            ...CMD_ITALIC_ON,                                       // Italic ON untuk tagline
+            ...encoder.encode('YOUR TYRE SOLUTION\n'),
+            ...CMD_ITALIC_OFF,                                      // Italic OFF segera setelah tagline
             ...encoder.encode('TERIMA KASIH ATAS KUNJUNGAN ANDA\n'),
             ...encoder.encode('Barang yang sudah dibeli\n'),
             ...encoder.encode('tidak dapat ditukar/dikembalikan'),  // TANPA \n — langsung feed
-            ...CMD_FEED_3MM,                                        // Feed tepat ~3mm
-            ...CMD_CUT_PAPER                                        // Potong kertas
+            ...CMD_FEED_5,                                          // Feed 5 baris agar teks melewati pisau
+            ...CMD_CUT_PAPER                                        // Potong kertas setelah feed selesai
         ];
 
         // === GABUNGKAN SEMUA BYTES ===
@@ -2929,7 +2935,7 @@ function showReceipt(transaction) {
                 <pre class="receipt-pre">${receiptTotalText}</pre>
             </div>
             <div class="receipt-footer">
-                <div><b>"YOUR TIRE SOLUTION"</b></div>
+                <div><b><i>"YOUR TYRE SOLUTION"</i></b></div>
                 <div><b>TERIMA KASIH ATAS KUNJUNGAN ANDA</b></div>
                 <div><b>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan</b></div>
             </div>
