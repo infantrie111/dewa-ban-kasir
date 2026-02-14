@@ -2556,7 +2556,7 @@ function resetCart(skipConfirm = false) {
 
 // ========================================
 // PRINTING FUNCTIONS — Smart Auto-Routing
-// v2.9.1-intent-fix
+// v2.9.3
 // USB OTG (Priority 1) → RawBT Intent (Fallback)
 // Kompatibel: Windows Laptop + Android HP
 // ========================================
@@ -2903,18 +2903,62 @@ function uint8ArrayToBase64(bytes) {
 }
 
 /**
- * Send ESC/POS data to RawBT Intent (Bluetooth Printer)
- * Fallback method when USB is not available
+ * Send ESC/POS data to RawBT via custom rawbt: URI scheme
+ * Uses the correct scheme that matches RawBT's registered Intent Filter.
+ *
+ * Format: rawbt:base64,<Base64EncodedESCPOSData>
+ *
+ * The previous "intent:...#Intent;scheme=rawbt;..." Chrome Intent syntax
+ * was INCORRECT — it caused Android to redirect to Play Store because
+ * Chrome's intent:// resolver couldn't match it to RawBT's actual
+ * intent filter. The rawbt: custom scheme is what RawBT registers
+ * in its AndroidManifest.xml and will directly launch the app.
+ *
  * @param {Uint8Array} bytes - ESC/POS byte array
  */
 function sendToRawBT(bytes) {
     try {
         const base64Data = uint8ArrayToBase64(bytes);
-        // Format wajib RawBT: "intent:" langsung disambung Base64, lalu parameter #Intent
-        const intentURL = "intent:" + base64Data + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;action=ru.a402d.rawbtprinter.PARSE;end;";
 
-        console.log('📲 Redirecting to RawBT Intent...');
-        window.location.href = intentURL;
+        // Construct rawbt: URI — this is the scheme RawBT actually registers
+        // Format: rawbt:base64,<data>
+        const rawbtURI = 'rawbt:base64,' + base64Data;
+
+        console.log(`📲 Launching RawBT via custom scheme (${bytes.length} bytes → ${base64Data.length} chars Base64)...`);
+
+        // Strategy: Use a hidden iframe to trigger the intent WITHOUT navigating
+        // away from the current POS page. This prevents the page from reloading
+        // and losing state. If iframe approach fails (some browsers block it),
+        // fall back to window.location.href with a slight delay.
+        let launched = false;
+
+        try {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = rawbtURI;
+            document.body.appendChild(iframe);
+
+            // Cleanup iframe after 3 seconds
+            setTimeout(() => {
+                if (iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
+            }, 3000);
+
+            launched = true;
+            console.log('✅ RawBT intent dispatched via iframe');
+        } catch (iframeErr) {
+            console.warn('⚠️ Iframe launch failed, using window.location fallback:', iframeErr.message);
+        }
+
+        // Fallback: direct location change (may cause page reload on some browsers)
+        if (!launched) {
+            window.location.href = rawbtURI;
+            console.log('✅ RawBT intent dispatched via window.location');
+        }
+
+        showAlert('📲 Struk dikirim ke printer Bluetooth via RawBT', 'success');
+
     } catch (error) {
         console.error('❌ RawBT Intent error:', error);
         showAlert('❌ Gagal mengirim ke printer Bluetooth: ' + error.message, 'danger');
