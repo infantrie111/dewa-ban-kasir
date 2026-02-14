@@ -1,9 +1,9 @@
 // ========================================
-// DEWA BAN POS — Service Worker v2.9.0-auto-routing
+// DEWA BAN POS — Service Worker v2.9.1-intent-fix
 // Smart Auto-Routing: USB OTG → RawBT Intent
 // ========================================
 
-const CACHE_NAME = 'dewa-ban-v2.9.0-auto-routing';
+const CACHE_NAME = 'dewa-ban-v2.9.1-intent-fix';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

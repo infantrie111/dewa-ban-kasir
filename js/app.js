@@ -2556,7 +2556,7 @@ function resetCart(skipConfirm = false) {
 
 // ========================================
 // PRINTING FUNCTIONS — Smart Auto-Routing
-// v2.9.0-auto-routing
+// v2.9.1-intent-fix
 // USB OTG (Priority 1) → RawBT Intent (Fallback)
 // Kompatibel: Windows Laptop + Android HP
 // ========================================
@@ -2910,7 +2910,8 @@ function uint8ArrayToBase64(bytes) {
 function sendToRawBT(bytes) {
     try {
         const base64Data = uint8ArrayToBase64(bytes);
-        const intentURL = `intent://...#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;action=ru.a402d.rawbtprinter.PARSE;S.base64=${base64Data};end;`;
+        // Format wajib RawBT: "intent:" langsung disambung Base64, lalu parameter #Intent
+        const intentURL = "intent:" + base64Data + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;action=ru.a402d.rawbtprinter.PARSE;end;";
 
         console.log('📲 Redirecting to RawBT Intent...');
         window.location.href = intentURL;
