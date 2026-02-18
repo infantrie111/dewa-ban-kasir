@@ -1659,6 +1659,18 @@ document.addEventListener('DOMContentLoaded', () => {
         deleteAllBtn.addEventListener('click', deleteAllTransactions);
     }
 
+    // v4.10: Show delete button ONLY when history tab is active
+    const adminTabsEl = document.getElementById('adminTabs');
+    if (adminTabsEl && deleteAllBtn) {
+        adminTabsEl.addEventListener('shown.bs.tab', (e) => {
+            if (e.target.id === 'history-tab') {
+                deleteAllBtn.classList.remove('d-none');
+            } else {
+                deleteAllBtn.classList.add('d-none');
+            }
+        });
+    }
+
     // Analytics Refresh
     const refreshAnalyticsBtn = document.getElementById('refresh-analytics-btn');
     if (refreshAnalyticsBtn) {

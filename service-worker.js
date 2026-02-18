@@ -1,8 +1,8 @@
-// DEWA BAN POS — Service Worker v4.9-sticky-tabs
+// DEWA BAN POS — Service Worker v4.10-safe-ui
 // Smart Auto-Routing: USB OTG → RawBT Intent
 // ========================================
 
-const CACHE_NAME = 'dewa-ban-v4.9-sticky-tabs';
+const CACHE_NAME = 'dewa-ban-v4.10-safe-ui';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
