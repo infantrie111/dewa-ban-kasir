@@ -1740,6 +1740,111 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // v3.1 Initialize Payroll System
     initPayrollSystem();
+
+    // ========================================
+    // v4.11: SMART NAVIGATION (History API)
+    // Prevents Android back button from closing
+    // the app; instead closes modals / navigates tabs
+    // ========================================
+
+    // --- Flag to prevent circular history.back() calls ---
+    let _navIgnoreNextPop = false;
+    let _navIgnoreHide = false;
+
+    // --- List of ALL application modal IDs ---
+    const NAV_MODAL_IDS = [
+        'paymentModal',
+        'settingsModal',
+        'adminModal',
+        'quickEditModal',
+        'brandEditModal',
+        'payrollSettingsModal',
+        'openShiftModal',
+        'mechanicModal',
+        'loginModal'
+    ];
+
+    // 1) Push state whenever ANY Bootstrap modal is shown
+    NAV_MODAL_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.addEventListener('show.bs.modal', () => {
+            history.pushState({ modalOpen: true, modalId: id }, '');
+        });
+
+        // 3) Cleanup: when user closes a modal manually (X button / Tutup),
+        //    pop the matching history entry so the stack stays in sync.
+        el.addEventListener('hidden.bs.modal', () => {
+            if (_navIgnoreHide) return;          // we already called history.back()
+            _navIgnoreNextPop = true;            // tell popstate handler to skip
+            history.back();                      // remove the pushed state
+        });
+    });
+
+    // 2) Admin tab navigation — push state on secondary tab activation
+    const _navAdminTabsEl = document.getElementById('adminTabs');
+    const FIRST_ADMIN_TAB_ID = 'stock-tab';      // The "home" tab
+    if (_navAdminTabsEl) {
+        _navAdminTabsEl.addEventListener('shown.bs.tab', (e) => {
+            if (e.target.id !== FIRST_ADMIN_TAB_ID) {
+                history.pushState({ tabActive: true, tabId: e.target.id }, '');
+            }
+        });
+    }
+
+    // --- Global popstate handler (fires on Back button press) ---
+    window.addEventListener('popstate', (e) => {
+        // Guard: if this pop was triggered by our own history.back() cleanup
+        if (_navIgnoreNextPop) {
+            _navIgnoreNextPop = false;
+            return;
+        }
+
+        const state = e.state;
+
+        // (A) If the state says a tab was active → go back to the first tab
+        if (state && state.tabActive) {
+            const firstTab = document.getElementById(FIRST_ADMIN_TAB_ID);
+            if (firstTab) {
+                const bsTab = new bootstrap.Tab(firstTab);
+                bsTab.show();
+            }
+            return;
+        }
+
+        // (B) Check if ANY Bootstrap modal is currently visible → close it
+        const openModal = document.querySelector('.modal.show');
+        if (openModal) {
+            // Skip static-backdrop modals like login
+            if (openModal.getAttribute('data-bs-backdrop') === 'static') return;
+
+            const instance = bootstrap.Modal.getInstance(openModal);
+            if (instance) {
+                _navIgnoreHide = true;           // prevent hidden handler from calling history.back()
+                instance.hide();
+                _navIgnoreHide = false;
+                // Push a blank state so that the next Back press can be intercepted
+                // (keep the app "alive" in the history stack)
+                history.pushState(null, '');
+            }
+            return;
+        }
+
+        // (C) No modal open, no tab state → re-push a blank state
+        //     so that the NEXT back press can also be caught
+        //     (prevents the app from actually closing on back press).
+        history.pushState(null, '');
+    });
+
+    // Seed the history with an initial blank state so the very first
+    // Back press does not navigate away.
+    history.pushState(null, '');
+
+    console.log('✅ v4.11 Smart Navigation initialized');
+    // ========================================
+    // END: SMART NAVIGATION
+    // ========================================
 });
 
 // Display products in the product list
