@@ -354,6 +354,9 @@ let currentTransaction = {
     total: 0
 };
 
+// v4.4: Global flag for 'Tanpa Pasang' mode
+let isTanpaPasangMode = false;
+
 const POS_SETTINGS_KEY = 'posSettings';
 const TRANSACTION_HISTORY_KEY = 'transaction_history';
 
@@ -446,13 +449,16 @@ function applySettingsToUI() {
     const settings = getSettings();
 
     if (settingsCashierNameInput) settingsCashierNameInput.value = settings.cashierName;
-    if (settingsStaffNameInput) settingsStaffNameInput.value = settings.staffName;
 
     document.querySelectorAll('.js-cashier-name').forEach(el => {
         el.textContent = settings.cashierName;
     });
+
+    // v4.2: Show active shift mechanic name, fallback to '-'
+    const activeShiftData = JSON.parse(localStorage.getItem('activeShift') || 'null');
+    const mechanicName = activeShiftData?.mechanic || '-';
     document.querySelectorAll('.js-staff-name').forEach(el => {
-        el.textContent = settings.staffName;
+        el.textContent = mechanicName;
     });
 }
 
@@ -558,6 +564,9 @@ function calculateDailyStats() {
     let totalProfit = 0;
 
     todays.forEach(t => {
+        // v3.1: Skip refunded transactions
+        if (t.isRefunded) return;
+
         totalRevenue += Number(t.total) || 0;
         (t.items || []).forEach(it => {
             const qty = Number(it.quantity) || 0;
@@ -775,6 +784,7 @@ function renderTransactionHistory() {
         const txNo = String(t?.transactionNo || '');
         const d = new Date(t?.date || Date.now());
         const parts = formatDateTimeParts(d);
+        const isRefunded = t.isRefunded === true;
 
         // Ambil nama produk dari items
         const items = t?.items || [];
@@ -793,14 +803,22 @@ function renderTransactionHistory() {
             productNames = 'Tidak ada item';
         }
 
+        // Visual Cue: Strikethrough for Refunded
+        const textStyle = isRefunded ? 'text-decoration: line-through;' : '';
+        const textClass = isRefunded ? 'text-muted' : 'fw-semibold';
+        const refundBadge = isRefunded ? '<br><span class="badge bg-danger mt-1">REFUNDED</span>' : '';
+
         const tr = document.createElement('tr');
+        if (isRefunded) tr.classList.add('table-light'); // Highlight row
+
         tr.innerHTML = `
             <td style="vertical-align: top;">
-                <div class="fw-semibold" style="word-wrap: break-word; white-space: normal; line-height: 1.4; max-width: 350px;">${productNames}</div>
+                <div class="${textClass}" style="word-wrap: break-word; white-space: normal; line-height: 1.4; max-width: 350px; ${textStyle}">${productNames}</div>
+                ${refundBadge}
                 <small class="text-muted">${parts.dateTime}</small>
             </td>
             <td style="text-align: center; vertical-align: middle;">
-                <div class="fw-bold">Rp ${formatNumber(Number(t?.total) || 0)}</div>
+                <div class="fw-bold ${isRefunded ? 'text-decoration-line-through text-muted' : ''}">Rp ${formatNumber(Number(t?.total) || 0)}</div>
                 <small class="text-muted d-block" style="font-size: 0.75rem;">${t.payment?.method ? t.payment.method.toUpperCase() : 'CASH'}</small>
             </td>
             <td style="text-align: center; vertical-align: middle;">
@@ -817,6 +835,12 @@ function renderTransactionHistory() {
                 </div>
             </td>
             <td style="text-align: center; vertical-align: middle;">
+                <button type="button" class="btn btn-sm btn-outline-warning" data-action="refund" data-tx="${txNo}" 
+                    title="Refund Transaksi" ${isRefunded ? 'disabled' : ''}>
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
                 <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-tx="${txNo}" aria-label="Hapus">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -824,6 +848,64 @@ function renderTransactionHistory() {
         `;
         adminHistoryTbody.appendChild(tr);
     });
+}
+
+function refundTransaction(transactionNo) {
+    const txNo = String(transactionNo || '').trim();
+    if (!txNo) return;
+
+    if (!confirm("Apakah Anda yakin ingin me-refund transaksi ini? Stok barang akan dikembalikan ke sistem.")) return;
+
+    const history = getTransactionHistory();
+    const trxIndex = history.findIndex(t => String(t?.transactionNo || '') === txNo);
+
+    if (trxIndex === -1) {
+        showAlert('Transaksi tidak ditemukan', 'warning');
+        return;
+    }
+
+    const trx = history[trxIndex];
+
+    if (trx.isRefunded) {
+        showAlert('Transaksi sudah di-refund sebelumnya', 'warning');
+        return;
+    }
+
+    // 1. Kembalikan Stok
+    (trx.items || []).forEach(item => {
+        const product = products.find(p => p.id === item.id);
+        if (product) {
+            const qtyToReturn = Number(item.quantity) || 0;
+            product.stock += qtyToReturn;
+            // Update stock di Firebase jika aktif
+            updateProductStockFirebase(product.id, product.stock);
+        }
+    });
+
+    // 2. Simpan perubahan stok
+    saveProducts();
+    syncCartStockFromProducts();
+
+    // 3. Mark as Refunded
+    trx.isRefunded = true;
+
+    // 4. Simpan History (Local & Firebase)
+    if (useFirebase && firebaseReady && trx.firebaseId) {
+        db.ref('transactions/' + trx.firebaseId).update({ isRefunded: true })
+            .then(() => console.log('✅ Refund status updated in Firebase'))
+            .catch(err => console.error('❌ Failed update refund status:', err));
+    }
+
+    // Update Local Storage History
+    localStorage.setItem(TRANSACTION_HISTORY_KEY, JSON.stringify(history));
+
+    // 5. Refresh UI
+    renderTransactionHistory();
+    renderAdminDailyStats();
+    renderBusinessAnalytics();
+    refreshCurrentProductView(); // Refresh product list stock display
+
+    showAlert('Transaksi berhasil di-refund. Stok telah dikembalikan.', 'success');
 }
 
 function reprintTransaction(transactionNo) {
@@ -934,25 +1016,30 @@ function downloadCSV(csv, filename) {
 
 function downloadDailyReport() {
     const history = getTransactionHistory();
-    const today = new Date();
-    const todayParts = formatDateTimeParts(today);
-    const fileDate = todayParts.date.replaceAll('/', '-');
+
+    // v4.8: Read target date from report date picker, fallback to today
+    const datePickerVal = document.getElementById('report-date-picker')?.value;
+    const targetDate = datePickerVal ? new Date(datePickerVal + 'T00:00:00') : new Date();
+    const targetParts = formatDateTimeParts(targetDate);
+    const fileDate = targetParts.date.replaceAll('/', '-');
     const filename = `Rekap_Harian_${fileDate}.csv`;
 
     const todays = history.filter(t => {
         const d = new Date(t.date);
-        return isSameLocalDate(d, today);
+        return isSameLocalDate(d, targetDate);
     });
 
     if (todays.length === 0) {
-        showAlert('Belum ada transaksi hari ini', 'warning');
+        showAlert(`Belum ada transaksi pada ${targetParts.date}`, 'warning');
         return;
     }
 
     let grandTotal = 0;
     let grandProfit = 0;
+    let totalMechanicFee = 0;
+    let totalDiscount = 0; // v4.2: Track total discounts
 
-    const header = 'Tanggal,Jam,No Transaksi,Kasir,Item,Nominal,Harga Modal,Laba per Item';
+    const header = 'Tanggal,Jam,No Transaksi,Kasir,Shift,Mekanik,Jumlah Bongkar,Fee Mekanik,Diskon,Item,Nominal,Harga Modal,Laba per Item';
     const rows = [];
 
     todays.forEach(t => {
@@ -961,23 +1048,53 @@ function downloadDailyReport() {
         const jam = parts.time.slice(0, 5);
         const kasir = t.cashier || '';
         const noTrx = t.transactionNo || '';
+        const shift = t.shift || '-';
+        const mechanic = t.mechanic || '-';
+        const bongkarCount = t.bongkarCount || 0;
+        const mechanicFee = t.mechanicFee || 0;
+        const discount = Number(t.discount) || 0;
+        const isRefunded = t.isRefunded === true;
+
+        if (!isRefunded) {
+            totalMechanicFee += Number(mechanicFee) || 0;
+            totalDiscount += discount; // v4.2
+        }
 
         (t.items || []).forEach(it => {
-            const itemName = it.quantity && it.quantity > 1 ? `${it.name} x${it.quantity}` : it.name;
+            let itemName = it.quantity && it.quantity > 1 ? `${it.name} x${it.quantity}` : it.name;
+
+            // v3.1: Mark refunded items
+            if (isRefunded) {
+                itemName = `[REFUNDED] ${itemName}`;
+            }
+
             const qty = Number(it.quantity) || 0;
             const price = Number(it.price) || 0;
-            const nominal = price * qty;
-            const rawCost = Number(it.costPrice);
-            const costPrice = Number.isFinite(rawCost) ? Math.max(0, rawCost) : Math.round(price * 0.8);
-            const profit = (price - costPrice) * qty;
-            grandTotal += nominal;
-            grandProfit += profit;
+            let nominal = price * qty;
+            let rawCost = Number(it.costPrice);
+            let costPrice = Number.isFinite(rawCost) ? Math.max(0, rawCost) : Math.round(price * 0.8);
+            let profit = (price - costPrice) * qty;
+
+            // v3.1: Zero out value for refunded transactions
+            if (isRefunded) {
+                nominal = 0;
+                costPrice = 0;
+                profit = 0;
+            } else {
+                grandTotal += nominal;
+                grandProfit += profit;
+            }
 
             rows.push([
                 parts.date,
                 jam,
                 noTrx,
                 kasir,
+                shift,
+                mechanic,
+                bongkarCount,
+                mechanicFee,
+                discount,
                 itemName,
                 nominal,
                 costPrice,
@@ -986,9 +1103,15 @@ function downloadDailyReport() {
         });
     });
 
-    const summaryRowRevenue = ['TOTAL PENDAPATAN HARI INI', '', '', '', '', grandTotal, '', ''].map(escapeCSV).join(',');
-    const summaryRowProfit = ['TOTAL LABA HARI INI', '', '', '', '', '', '', grandProfit].map(escapeCSV).join(',');
-    const csv = `${header}\n${rows.join('\n')}\n\n${summaryRowRevenue}\n${summaryRowProfit}`;
+    const netProfit = grandProfit - totalMechanicFee - totalDiscount; // v4.2: Subtract discounts
+
+    const summaryRowRevenue = [`TOTAL PENDAPATAN ${fileDate}`, '', '', '', '', '', '', '', '', '', grandTotal, '', ''].map(escapeCSV).join(',');
+    const summaryRowGrossProfit = ['TOTAL LABA KOTOR', '', '', '', '', '', '', '', '', '', '', '', grandProfit].map(escapeCSV).join(',');
+    const summaryRowDiscount = ['TOTAL DISKON (Tanpa Pasang dll)', '', '', '', '', '', '', '', '', '', '', '', `-${totalDiscount}`].map(escapeCSV).join(',');
+    const summaryRowFee = ['BEBAN GAJI MEKANIK', '', '', '', '', '', '', '', '', '', '', '', `-${totalMechanicFee}`].map(escapeCSV).join(',');
+    const summaryRowNetProfit = ['TOTAL LABA BERSIH (Setelah Gaji & Diskon)', '', '', '', '', '', '', '', '', '', '', '', netProfit].map(escapeCSV).join(',');
+
+    const csv = `${header}\n${rows.join('\n')}\n\n${summaryRowRevenue}\n${summaryRowGrossProfit}\n${summaryRowDiscount}\n${summaryRowFee}\n${summaryRowNetProfit}`;
     downloadCSV(csv, filename);
 }
 
@@ -1006,25 +1129,39 @@ function getMonthName(monthIndex) {
 
 function downloadMonthlyReport() {
     const history = getTransactionHistory();
-    const today = new Date();
-    const monthName = getMonthName(today.getMonth());
-    const year = today.getFullYear();
-    const filename = `Rekap_Bulanan_${monthName}_${year}.csv`;
+
+    // v4.8: Read target month from report month picker, fallback to this month
+    const monthPickerVal = document.getElementById('report-month-picker')?.value; // 'YYYY-MM'
+    let targetYear, targetMonthIndex, monthName;
+    if (monthPickerVal) {
+        const [y, m] = monthPickerVal.split('-');
+        targetYear = Number(y);
+        targetMonthIndex = Number(m) - 1;
+        monthName = getMonthName(targetMonthIndex);
+    } else {
+        const now = new Date();
+        targetYear = now.getFullYear();
+        targetMonthIndex = now.getMonth();
+        monthName = getMonthName(targetMonthIndex);
+    }
+    const filename = `Rekap_Bulanan_${monthName}_${targetYear}.csv`;
 
     const thisMonth = history.filter(t => {
         const d = new Date(t.date);
-        return isSameLocalMonth(d, today);
+        return d.getFullYear() === targetYear && d.getMonth() === targetMonthIndex;
     });
 
     if (thisMonth.length === 0) {
-        showAlert(`Belum ada transaksi di bulan ${monthName} ${year}`, 'warning');
+        showAlert(`Belum ada transaksi di bulan ${monthName} ${targetYear}`, 'warning');
         return;
     }
 
     let grandTotal = 0;
     let grandProfit = 0;
+    let totalMechanicFee = 0;
+    let totalDiscount = 0; // v4.2: Track total discounts
 
-    const header = 'Tanggal,Jam,No Transaksi,Kasir,Item,Nominal,Harga Modal,Laba per Item';
+    const header = 'Tanggal,Jam,No Transaksi,Kasir,Shift,Mekanik,Jumlah Bongkar,Fee Mekanik,Diskon,Item,Nominal,Harga Modal,Laba per Item';
     const rows = [];
 
     thisMonth.forEach(t => {
@@ -1033,23 +1170,53 @@ function downloadMonthlyReport() {
         const jam = parts.time.slice(0, 5);
         const kasir = t.cashier || '';
         const noTrx = t.transactionNo || '';
+        const shift = t.shift || '-';
+        const mechanic = t.mechanic || '-';
+        const bongkarCount = t.bongkarCount || 0;
+        const mechanicFee = t.mechanicFee || 0;
+        const discount = Number(t.discount) || 0;
+        const isRefunded = t.isRefunded === true;
+
+        if (!isRefunded) {
+            totalMechanicFee += Number(mechanicFee) || 0;
+            totalDiscount += discount; // v4.2
+        }
 
         (t.items || []).forEach(it => {
-            const itemName = it.quantity && it.quantity > 1 ? `${it.name} x${it.quantity}` : it.name;
+            let itemName = it.quantity && it.quantity > 1 ? `${it.name} x${it.quantity}` : it.name;
+
+            // v3.1: Mark refunded items
+            if (isRefunded) {
+                itemName = `[REFUNDED] ${itemName}`;
+            }
+
             const qty = Number(it.quantity) || 0;
             const price = Number(it.price) || 0;
-            const nominal = price * qty;
-            const rawCost = Number(it.costPrice);
-            const costPrice = Number.isFinite(rawCost) ? Math.max(0, rawCost) : Math.round(price * 0.8);
-            const profit = (price - costPrice) * qty;
-            grandTotal += nominal;
-            grandProfit += profit;
+            let nominal = price * qty;
+            let rawCost = Number(it.costPrice);
+            let costPrice = Number.isFinite(rawCost) ? Math.max(0, rawCost) : Math.round(price * 0.8);
+            let profit = (price - costPrice) * qty;
+
+            // v3.1: Zero out value for refunded transactions
+            if (isRefunded) {
+                nominal = 0;
+                costPrice = 0;
+                profit = 0;
+            } else {
+                grandTotal += nominal;
+                grandProfit += profit;
+            }
 
             rows.push([
                 parts.date,
                 jam,
                 noTrx,
                 kasir,
+                shift,
+                mechanic,
+                bongkarCount,
+                mechanicFee,
+                discount,
                 itemName,
                 nominal,
                 costPrice,
@@ -1058,9 +1225,15 @@ function downloadMonthlyReport() {
         });
     });
 
-    const summaryRowRevenue = [`TOTAL PENDAPATAN BULAN ${monthName.toUpperCase()} ${year}`, '', '', '', '', grandTotal, '', ''].map(escapeCSV).join(',');
-    const summaryRowProfit = [`TOTAL LABA BULAN ${monthName.toUpperCase()} ${year}`, '', '', '', '', '', '', grandProfit].map(escapeCSV).join(',');
-    const csv = `${header}\n${rows.join('\n')}\n\n${summaryRowRevenue}\n${summaryRowProfit}`;
+    const netProfit = grandProfit - totalMechanicFee - totalDiscount; // v4.2: Subtract discounts
+
+    const summaryRowRevenue = [`TOTAL PENDAPATAN BULAN ${monthName.toUpperCase()} ${targetYear}`, '', '', '', '', '', '', '', '', '', grandTotal, '', ''].map(escapeCSV).join(',');
+    const summaryRowGrossProfit = [`TOTAL LABA KOTOR`, '', '', '', '', '', '', '', '', '', '', '', grandProfit].map(escapeCSV).join(',');
+    const summaryRowDiscount = ['TOTAL DISKON (Tanpa Pasang dll)', '', '', '', '', '', '', '', '', '', '', '', `-${totalDiscount}`].map(escapeCSV).join(',');
+    const summaryRowFee = ['BEBAN GAJI MEKANIK', '', '', '', '', '', '', '', '', '', '', '', `-${totalMechanicFee}`].map(escapeCSV).join(',');
+    const summaryRowNetProfit = ['TOTAL LABA BERSIH', '', '', '', '', '', '', '', '', '', '', '', netProfit].map(escapeCSV).join(',');
+
+    const csv = `${header}\n${rows.join('\n')}\n\n${summaryRowRevenue}\n${summaryRowGrossProfit}\n${summaryRowDiscount}\n${summaryRowFee}\n${summaryRowNetProfit}`;
     downloadCSV(csv, filename);
 }
 
@@ -1320,6 +1493,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (settingsModalEl) {
         settingsModalEl.addEventListener('show.bs.modal', () => {
             applySettingsToUI();
+            // v4.8: Smart defaults for report date/month pickers
+            const now = new Date();
+            const reportDatePicker = document.getElementById('report-date-picker');
+            const reportMonthPicker = document.getElementById('report-month-picker');
+            if (reportDatePicker && !reportDatePicker.value) {
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                reportDatePicker.value = `${yyyy}-${mm}-${dd}`;
+            }
+            if (reportMonthPicker && !reportMonthPicker.value) {
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                reportMonthPicker.value = `${yyyy}-${mm}`;
+            }
         });
     }
 
@@ -1338,6 +1526,10 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAdminDailyStats();
             renderTransactionHistory();
             renderBusinessAnalytics();
+            // v4.8: Auto-reset payroll date filter & render dashboard when admin opens
+            resetPayrollDateFilter();
+            populatePayrollMechanicFilter();
+            renderPayrollDashboard();
         });
     }
 
@@ -1518,6 +1710,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (action === 'print-pdf') showReceipt(trx);
             if (action === 'share-wa') shareViaWhatsApp(trx);
             if (action === 'delete') deleteTransaction(txNo);
+            if (action === 'refund') refundTransaction(txNo);
         });
     }
 
@@ -1533,6 +1726,8 @@ document.addEventListener('DOMContentLoaded', () => {
             resetCart();
         });
     }
+    // v3.1 Initialize Payroll System
+    initPayrollSystem();
 });
 
 // Display products in the product list
@@ -2499,6 +2694,39 @@ function showPaymentModal() {
         return;
     }
 
+    // --- GATEKEEPER: CHECK SHIFT STATUS ---
+    const activeShiftJson = localStorage.getItem('activeShift');
+
+    // 1. Cek Apakah Shift Ada?
+    if (!activeShiftJson) {
+        alert('⚠️ Anda belum membuka Shift! Silakan Buka Shift di menu Admin > Gaji Karyawan terlebih dahulu.');
+        return; // STOP!
+    }
+
+    // 2. Cek Apakah Shift Kadaluarsa (Beda Hari)?
+    const activeShift = JSON.parse(activeShiftJson);
+    const shiftDate = new Date(activeShift.startTime).toDateString(); // "Wed Feb 18 2026"
+    const todayDate = new Date().toDateString();
+
+    if (shiftDate !== todayDate) {
+        // Shift Expired -> Kill It
+        localStorage.removeItem('activeShift');
+        if (typeof updateShiftButtonUI === 'function') updateShiftButtonUI();
+
+        alert('⚠️ Shift kemarin sudah kadaluarsa! Silakan Buka Shift baru untuk hari ini.');
+        return; // STOP!
+    }
+    // --------------------------------------
+
+    // v4.8: Force-reset Tanpa Pasang state when opening payment modal
+    isTanpaPasangMode = false;
+    discountEl.value = '0';
+    const btnTP = document.getElementById('btn-tanpa-pasang');
+    if (btnTP) {
+        btnTP.className = 'btn btn-warning w-100 mb-3';
+        btnTP.innerHTML = '<i class="bi bi-box-seam me-2"></i>Tanpa Pasang (Diskon Rp 10.000) \u2014 OFF';
+    }
+
     const total = updateTotals();
     billAmountEl.value = `Rp ${formatNumber(total)}`;
     amountPaidEl.value = '';
@@ -2548,6 +2776,35 @@ function completePayment() {
     const settings = getSettings();
     const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
 
+    // v4.0 Payroll Injection
+    const activeShift = JSON.parse(localStorage.getItem('activeShift') || '{}');
+    const payrollSettings = JSON.parse(localStorage.getItem('payrollSettings') || '{}');
+
+    // v4.4: Dynamic bongkarCount with exclusion filter & Tanpa Pasang override
+    const excludedBrands = payrollSettings.excludedBrands || [];
+    let bongkarCount = 0;
+
+    if (isTanpaPasangMode) {
+        // Kondisi A: Tanpa Pasang → ban tidak dikerjakan di tempat
+        bongkarCount = 0;
+    } else {
+        // Kondisi B: Hitung item yang brand-nya TIDAK di-exclude
+        bongkarCount = cart.reduce((sum, item) => {
+            const brand = (item.brand || '').toUpperCase();
+            if (excludedBrands.includes(item.brand)) return sum; // Skip excluded brands
+            return sum + (Number(item.quantity) || 0);
+        }, 0);
+    }
+
+    // Hitung Fee Mekanik
+    let mechanicFee = 0;
+    const shiftType = (activeShift.type || '').toLowerCase();
+    if (shiftType === 'siang') {
+        mechanicFee = bongkarCount * (Number(payrollSettings.tireFeeDay) || 0);
+    } else if (shiftType === 'malam') {
+        mechanicFee = bongkarCount * (Number(payrollSettings.tireFeeNight) || 0);
+    }
+
     const transactionData = {
         ...currentTransaction,
         items: cart.map(it => {
@@ -2566,7 +2823,11 @@ function completePayment() {
         paidAt: formatDateTimeParts(paidAtDate).dateTime,
         transactionNo,
         cashier: settings.cashierName,
-        staff: settings.staffName
+        staff: activeShift.mechanic || null, // v4.2: Only use shift mechanic
+        shift: activeShift.type || null, // v3.1
+        mechanic: activeShift.mechanic || null, // v4.2: Only use shift mechanic
+        bongkarCount: bongkarCount, // v4.0
+        mechanicFee: mechanicFee // v4.0
     };
 
     // ✅ v53: Cetak struk via RawBT Silent Print (bukan window.print lagi)
@@ -2627,6 +2888,13 @@ function resetCart(skipConfirm = false) {
         updateCart();
         discountEl.value = '0';
         taxEl.value = '0';
+        // v4.8: Reset Tanpa Pasang toggle state fully
+        isTanpaPasangMode = false;
+        const btnTP = document.getElementById('btn-tanpa-pasang');
+        if (btnTP) {
+            btnTP.className = 'btn btn-warning w-100 mb-3';
+            btnTP.innerHTML = '<i class="bi bi-box-seam me-2"></i>Tanpa Pasang (Diskon Rp 10.000) \u2014 OFF';
+        }
     }
 }
 
@@ -3104,7 +3372,7 @@ async function cetakStruk(transaksi) {
             ...encoder.encode(`No: ${txNo}\n`),
             ...encoder.encode(`Tgl: ${parts.dateTime}\n`),
             ...(transaksi.cashier ? encoder.encode(`Kasir: ${transaksi.cashier}\n`) : []),
-            ...(transaksi.staff ? encoder.encode(`Mekanik: ${transaksi.staff}\n`) : []),
+            ...((transaksi.mechanic || transaksi.staff) ? encoder.encode(`Mekanik: ${transaksi.mechanic || transaksi.staff}\n`) : []),
             ...encoder.encode('================================\n'),
         ];
 
@@ -3961,7 +4229,7 @@ function renderRevenueChart(transactions) {
 
         // Sum revenue for this day
         const dayRevenue = transactions
-            .filter(t => isSameLocalDate(new Date(t.date), d))
+            .filter(t => isSameLocalDate(new Date(t.date), d) && !t.isRefunded) // v3.1 Exclude Refunded
             .reduce((sum, t) => {
                 const profit = (t.items || []).reduce((psum, it) => {
                     const cost = Number(it.costPrice) || Math.round(Number(it.price) * 0.8);
@@ -4007,6 +4275,7 @@ function renderTopProductsChart(transactions) {
     // User asked for "Top 5 Products Sold". Usually historical.
     const productSales = {};
     transactions.forEach(t => {
+        if (t.isRefunded) return; // v3.1 Exclude Refunded
         (t.items || []).forEach(it => {
             const name = it.name;
             const qty = Number(it.quantity) || 0;
@@ -4053,6 +4322,7 @@ function renderBrandSalesChart(transactions) {
     // Aggregate Brand Sales
     const brandSales = {};
     transactions.forEach(t => {
+        if (t.isRefunded) return; // v3.1 Exclude Refunded
         (t.items || []).forEach(it => {
             let brand = it.brand;
 
@@ -4108,3 +4378,482 @@ function renderBrandSalesChart(transactions) {
     });
 }
 
+
+// ========================================
+// PAYROLL & SHIFT SYSTEM (v4.0 - FINAL)
+// ========================================
+
+// v4.8: Helper to reset payroll date filter to today
+function resetPayrollDateFilter() {
+    const dateInput = document.getElementById('payroll-date-filter');
+    if (dateInput) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        dateInput.value = `${yyyy}-${mm}-${dd}`;
+    }
+}
+
+function initPayrollSystem() {
+    // 1. Bind Payroll Settings Save Button
+    const savePayrollBtn = document.getElementById('save-payroll-settings-btn');
+    if (savePayrollBtn) {
+        savePayrollBtn.addEventListener('click', savePayrollSettings);
+    }
+
+    // 2. Bind Start Shift Button
+    const startShiftBtn = document.getElementById('start-shift-btn');
+    if (startShiftBtn) {
+        startShiftBtn.addEventListener('click', startShift);
+    }
+
+    // 3. Load Payroll Settings to Modal Inputs
+    const payrollModal = document.getElementById('payrollSettingsModal');
+    if (payrollModal) {
+        payrollModal.addEventListener('show.bs.modal', loadPayrollSettings);
+    }
+
+    // 4. v4.8: Live 'change' listeners on filter inputs (replaces dead filter button)
+    const payrollDateInput = document.getElementById('payroll-date-filter');
+    const payrollMechanicSelect = document.getElementById('payroll-mechanic-filter');
+    if (payrollDateInput) {
+        payrollDateInput.addEventListener('change', renderPayrollDashboard);
+    }
+    if (payrollMechanicSelect) {
+        payrollMechanicSelect.addEventListener('change', renderPayrollDashboard);
+    }
+
+    const payrollTab = document.getElementById('payroll-tab');
+    if (payrollTab) {
+        payrollTab.addEventListener('shown.bs.tab', () => {
+            resetPayrollDateFilter(); // v4.8: Always reset to today
+            populatePayrollMechanicFilter(); // Refresh mechanics list
+            renderPayrollDashboard();
+        });
+    }
+
+    // 5. Set Default Date to Today
+    resetPayrollDateFilter();
+
+    // 6. The Gatekeeper: Check Active Shift
+    checkShiftGatekeeper();
+
+    // =============================================
+    // v4.2: CONNECT DEAD BUTTONS & MODAL SYNC
+    // =============================================
+
+    // 7. Connect #add-mechanic-cbtn to addNewMechanicMaster()
+    const addMechanicBtn = document.getElementById('add-mechanic-cbtn');
+    if (addMechanicBtn) {
+        addMechanicBtn.addEventListener('click', addNewMechanicMaster);
+    }
+
+    // 8. Connect #btn-toggle-shift to handleToggleShift()
+    const toggleShiftBtn = document.getElementById('btn-toggle-shift');
+    if (toggleShiftBtn) {
+        toggleShiftBtn.addEventListener('click', handleToggleShift);
+    }
+
+    // 9. Sync Mechanic Modal: populate list every time it opens
+    const mechanicModalEl = document.getElementById('mechanicModal');
+    if (mechanicModalEl) {
+        mechanicModalEl.addEventListener('show.bs.modal', () => {
+            populateMechanicListModal();
+        });
+        // v4.2: When mechanic modal closes, refresh ALL dependent dropdowns
+        mechanicModalEl.addEventListener('hidden.bs.modal', () => {
+            populatePayrollMechanicFilter();
+            populateShiftMechanicDropdown();
+        });
+    }
+
+    // 10. Sync Open Shift Modal: populate dropdown every time it opens
+    const openShiftModalEl = document.getElementById('openShiftModal');
+    if (openShiftModalEl) {
+        openShiftModalEl.addEventListener('show.bs.modal', () => {
+            populateShiftMechanicDropdown();
+        });
+    }
+
+    // 11. 'Tanpa Pasang' Toggle Button (v4.8: proper ON/OFF toggle)
+    const btnTanpaPasang = document.getElementById('btn-tanpa-pasang');
+    if (btnTanpaPasang) {
+        btnTanpaPasang.addEventListener('click', () => {
+            const discountInput = document.getElementById('discount');
+            const billEl = document.getElementById('bill-amount');
+
+            if (!isTanpaPasangMode) {
+                // === TURN ON ===
+                isTanpaPasangMode = true;
+                if (discountInput) discountInput.value = 10000;
+                btnTanpaPasang.className = 'btn btn-danger w-100 mb-3';
+                btnTanpaPasang.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i>Tanpa Pasang AKTIF \u2014 Batalkan';
+            } else {
+                // === TURN OFF ===
+                isTanpaPasangMode = false;
+                if (discountInput) discountInput.value = 0;
+                btnTanpaPasang.className = 'btn btn-warning w-100 mb-3';
+                btnTanpaPasang.innerHTML = '<i class="bi bi-box-seam me-2"></i>Tanpa Pasang (Diskon Rp 10.000) \u2014 OFF';
+            }
+
+            // Recalculate totals & refresh payment modal
+            updateTotals();
+            const total = currentTransaction.total;
+            if (billEl) billEl.value = `Rp ${formatNumber(total)}`;
+            calculateChange();
+        });
+    }
+
+    // 12. Update staff name in header based on active shift (v4.2)
+    applySettingsToUI();
+}
+
+function loadPayrollSettings() {
+    const settings = JSON.parse(localStorage.getItem('payrollSettings') || '{}');
+    if (document.getElementById('payroll-basic-salary')) {
+        document.getElementById('payroll-basic-salary').value = settings.basicSalary || '';
+    }
+    if (document.getElementById('payroll-tire-fee-day')) {
+        document.getElementById('payroll-tire-fee-day').value = settings.tireFeeDay || '';
+    }
+    if (document.getElementById('payroll-tire-fee-night')) {
+        document.getElementById('payroll-tire-fee-night').value = settings.tireFeeNight || '';
+    }
+
+    // v4.4: Render brand exclusion checkboxes
+    const container = document.getElementById('payroll-exclusion-list');
+    if (container) {
+        container.innerHTML = '';
+        const excludedBrands = settings.excludedBrands || [];
+
+        // Collect all unique brands from product catalog
+        const allBrands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
+
+        allBrands.forEach(brand => {
+            const id = `excl-brand-${brand.replace(/\s+/g, '-').toLowerCase()}`;
+            const isChecked = excludedBrands.includes(brand);
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            div.innerHTML = `
+                <input class="form-check-input payroll-brand-exclusion" type="checkbox" value="${brand}" id="${id}" ${isChecked ? 'checked' : ''}>
+                <label class="form-check-label" for="${id}">${brand}</label>
+            `;
+            container.appendChild(div);
+        });
+    }
+}
+
+function savePayrollSettings() {
+    const basicSalary = document.getElementById('payroll-basic-salary').value;
+    const tireFeeDay = document.getElementById('payroll-tire-fee-day').value;
+    const tireFeeNight = document.getElementById('payroll-tire-fee-night').value;
+
+    // v4.4: Collect excluded brands from checkboxes
+    const excludedBrands = [];
+    document.querySelectorAll('.payroll-brand-exclusion:checked').forEach(cb => {
+        excludedBrands.push(cb.value);
+    });
+
+    const settings = {
+        basicSalary: Number(basicSalary) || 0,
+        tireFeeDay: Number(tireFeeDay) || 0,
+        tireFeeNight: Number(tireFeeNight) || 0,
+        excludedBrands: excludedBrands // v4.4
+    };
+
+    localStorage.setItem('payrollSettings', JSON.stringify(settings));
+
+    // Hide Modal
+    const modalEl = document.getElementById('payrollSettingsModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    showAlert('Parameter gaji berhasil disimpan', 'success');
+    renderPayrollDashboard(); // Refresh dashboard if settings changed
+}
+
+// --- SHIFT LOGIC ---
+
+function updateShiftButtonUI() {
+    const activeShift = localStorage.getItem('activeShift');
+    const btn = document.getElementById('btn-toggle-shift');
+    if (!btn) return;
+
+    if (activeShift) {
+        // Shift Open -> Show Close Option
+        btn.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i>Tutup Shift';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-danger');
+    } else {
+        // Shift Closed -> Show Open Option
+        btn.innerHTML = '<i class="bi bi-play-circle-fill me-1"></i>Buka Shift';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-success');
+    }
+}
+
+function handleToggleShift() {
+    const activeShift = localStorage.getItem('activeShift');
+    if (activeShift) {
+        // Close Shift
+        if (confirm('Apakah Anda yakin ingin MENUTUP Shift ini?')) {
+            localStorage.removeItem('activeShift');
+            updateShiftButtonUI();
+            // v4.2: Update staff name in header
+            applySettingsToUI();
+            showAlert('Shift berhasil ditutup.', 'success');
+        }
+    } else {
+        // Open Shift Modal
+        const modalEl = document.getElementById('openShiftModal');
+        const modal = new bootstrap.Modal(modalEl);
+        // Refresh mechanic dropdown in modal from master list
+        populateShiftMechanicDropdown();
+        modal.show();
+    }
+}
+
+// --- MASTER EMPLOYEE CRUD ---
+
+function getMechanicMasterList() {
+    const defaultMechs = ['Ipeng', 'Kipli', 'Agus'];
+    const stored = JSON.parse(localStorage.getItem('mechanicsList') || '[]');
+    // Merge defaults if stored is empty or just use stored
+    if (stored.length === 0) return defaultMechs;
+    return stored;
+}
+
+function saveMechanicMasterList(list) {
+    localStorage.setItem('mechanicsList', JSON.stringify(list));
+    populatePayrollMechanicFilter();
+    populateMechanicListModal();
+    populateShiftMechanicDropdown(); // Update the shift modal dropdown too
+}
+
+function addNewMechanicMaster() {
+    const input = document.getElementById('new-mechanic-cname');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) return;
+
+    const list = getMechanicMasterList();
+    if (list.includes(name)) {
+        alert('Nama karyawan sudah ada!');
+        return;
+    }
+
+    list.push(name);
+    saveMechanicMasterList(list);
+    input.value = '';
+    showAlert('Karyawan berhasil ditambahkan', 'success');
+}
+
+function deleteMechanicMaster(name) {
+    if (!confirm(`Hapus karyawan ${name}?`)) return;
+    let list = getMechanicMasterList();
+    list = list.filter(m => m !== name);
+    saveMechanicMasterList(list);
+}
+
+function populateMechanicListModal() {
+    const ul = document.getElementById('mechanic-list-group');
+    if (!ul) return;
+    ul.innerHTML = '';
+    const list = getMechanicMasterList();
+
+    list.forEach(name => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.innerHTML = `
+            ${name}
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteMechanicMaster('${name}')">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+        ul.appendChild(li);
+    });
+}
+
+function populateShiftMechanicDropdown() {
+    const select = document.getElementById('shift-mechanic');
+    if (!select) return;
+    const list = getMechanicMasterList();
+    select.innerHTML = '<option value="" selected disabled>Pilih Mekanik...</option>';
+    list.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        select.appendChild(opt);
+    });
+}
+
+function checkShiftGatekeeper() {
+    // Deprecated: No longer force popup on load
+    // Keep function for potential future manual checks
+    updateShiftButtonUI();
+}
+
+function startShift() {
+    const mechanic = document.getElementById('shift-mechanic').value;
+    const type = document.getElementById('shift-type').value;
+
+    if (!mechanic) {
+        alert('Harap pilih mekanik yang bertugas!');
+        return;
+    }
+
+    const shiftData = {
+        mechanic: mechanic,
+        type: type, // 'Siang' or 'Malam'
+        startTime: new Date().toISOString()
+    };
+
+    localStorage.setItem('activeShift', JSON.stringify(shiftData));
+
+    // Hide Modal
+    const modalEl = document.getElementById('openShiftModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    updateShiftButtonUI();
+    // v4.2: Update staff name in header immediately
+    applySettingsToUI();
+    showAlert(`Shift ${type} dimulai. Selamat bertugas, ${mechanic}!`, 'success');
+}
+
+// ----------------------------------------------------
+// PAYROLL DASHBOARD LOGIC
+// ----------------------------------------------------
+
+function populatePayrollMechanicFilter() {
+    const select = document.getElementById('payroll-mechanic-filter');
+    if (!select) return;
+
+    // v4.2: Get unique mechanics from history + master list (no hardcoded names)
+    const history = getTransactionHistory();
+    const mechanics = new Set();
+
+    // Add from transaction history (including legacy 'staff' field)
+    history.forEach(t => {
+        if (t.mechanic) mechanics.add(t.mechanic);
+        if (t.staff && !t.mechanic) mechanics.add(t.staff); // Fallback for old data
+    });
+
+    // v4.2: Add from master employee list (replaces hardcoded ['Ipeng', 'Kipli', 'Agus'])
+    getMechanicMasterList().forEach(m => mechanics.add(m));
+
+    // Preserve selection
+    const currentVal = select.value;
+
+    select.innerHTML = '<option value="all">Semua Mekanik</option>';
+    Array.from(mechanics).sort().forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        select.appendChild(opt);
+    });
+
+    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+    }
+}
+
+function renderPayrollDashboard() {
+    const dateInput = document.getElementById('payroll-date-filter');
+    const mechanicSelect = document.getElementById('payroll-mechanic-filter');
+    const tbody = document.getElementById('payroll-audit-tbody');
+
+    if (!dateInput || !mechanicSelect || !tbody) return;
+
+    const filterDate = dateInput.value; // YYYY-MM-DD
+    const filterMechanic = mechanicSelect.value;
+    const settings = JSON.parse(localStorage.getItem('payrollSettings') || '{}');
+    const dailyBase = Number(settings.basicSalary) || 0;
+
+    // 1. Get Transaction History (exclude refunded)
+    const history = getTransactionHistory().filter(t => !t.isRefunded);
+
+    // 2. Filter Logic
+    const filtered = history.filter(t => {
+        // Date Filter
+        if (filterDate) {
+            const tDate = new Date(t.date);
+            const tDateStr = tDate.getFullYear() + '-' +
+                String(tDate.getMonth() + 1).padStart(2, '0') + '-' +
+                String(tDate.getDate()).padStart(2, '0');
+            if (tDateStr !== filterDate) return false;
+        }
+
+        // Mechanic Filter
+        if (filterMechanic !== 'all') {
+            const tMech = t.mechanic || t.staff; // Fallback
+            if (tMech !== filterMechanic) return false;
+        }
+
+        return true;
+    });
+
+    // 3. Calculate Totals
+    let totalTrx = filtered.length;
+    let totalBongkar = 0;
+    let totalFee = 0;
+
+    // 4. Populate Table & Sums
+    tbody.innerHTML = '';
+    filtered.forEach(t => {
+        // Sums
+        const bongkar = Number(t.bongkarCount) || 0;
+        const fee = Number(t.mechanicFee) || 0;
+        totalBongkar += bongkar;
+        totalFee += fee;
+
+        // Table Row
+        const d = new Date(t.date);
+        const parts = formatDateTimeParts(d);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${parts.dateTime}</td>
+            <td>${t.transactionNo}</td>
+            <td>${t.mechanic || t.staff || '-'}</td>
+            <td class="text-center"><span class="badge ${t.shift === 'Siang' || t.shift === 'siang' ? 'bg-warning text-dark' : 'bg-dark'}">${t.shift || '-'}</span></td>
+            <td class="text-center fw-bold">${bongkar}</td>
+            <td class="text-end font-monospace">Rp ${formatNumber(fee)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // 5. Calculate Daily Salary Logic
+    // "Cari tahu ada berapa "hari unik" (tanggal berbeda) di mana mekanik tersebut memiliki transaksi dengan shift === 'siang'"
+    let totalDailySalary = 0;
+    const uniqueDaysMap = new Map(); // Mechanic -> Set of Dates
+
+    filtered.forEach(t => {
+        const mech = t.mechanic || t.staff;
+        if (!mech) return;
+
+        // Check Shift Type (Case insensitive)
+        const shift = (t.shift || '').toLowerCase();
+        if (shift === 'siang') {
+            const dateStr = new Date(t.date).toDateString(); // "Wed Feb 18 2026"
+
+            if (!uniqueDaysMap.has(mech)) {
+                uniqueDaysMap.set(mech, new Set());
+            }
+            uniqueDaysMap.get(mech).add(dateStr);
+        }
+    });
+
+    uniqueDaysMap.forEach((datesSet, mechanic) => {
+        totalDailySalary += datesSet.size * dailyBase;
+    });
+
+    const takeHomePay = totalFee + totalDailySalary;
+
+    // 6. Update Summary Cards
+    document.getElementById('payroll-summary-trx').textContent = totalTrx;
+    document.getElementById('payroll-summary-bongkar-qty').textContent = totalBongkar;
+    document.getElementById('payroll-summary-fee').textContent = `Rp ${formatNumber(totalFee)}`;
+    document.getElementById('payroll-summary-daily').textContent = `Rp ${formatNumber(totalDailySalary)}`;
+    document.getElementById('payroll-summary-total').textContent = `Rp ${formatNumber(takeHomePay)}`;
+}

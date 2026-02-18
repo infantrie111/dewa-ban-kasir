@@ -758,44 +758,43 @@ header {
 /* ========================================
    MODAL FIX: PREVENT TENGGELAM (CUT-OFF)
    ======================================== */
+.modal-dialog {
+    margin: 1.75rem auto;
+}
 
-/* Ensure modal never exceeds viewport height */
 .modal-content {
-    max-height: 90vh !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    max-height: 95vh !important;
+    border: none !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Only modal body scrolls, header and footer stay fixed */
-.modal-body {
-    overflow-y: auto !important;
-    flex: 1 1 auto !important;
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Modal header stays at top */
-.modal-header {
-    flex-shrink: 0 !important;
-}
-
-/* Modal footer stays at bottom */
+.modal-header,
 .modal-footer {
     flex-shrink: 0 !important;
+    background-color: #fff;
+    z-index: 10;
 }
 
-/* Styling logo agar besar dan memenuhi header */
+.modal-body {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    padding: 1.25rem !important;
+}
+
+/* Styling logo agar besar dan memenuhi header (Restored) */
 .main-logo {
     height: 65px;
     width: auto;
     object-fit: contain;
     padding: 0;
     margin-left: 0;
-    /* Menghilangkan margin bawaan agar benar-benar mepet atas-bawah */
     display: block;
 }
 
-/* Memastikan bar header cukup tinggi untuk logo besar */
 header .container-fluid .row {
     min-height: 0 !important;
 }
@@ -803,65 +802,61 @@ header .container-fluid .row {
 /* ========================================
    MODAL ADMIN RESPONSIVE LAYOUT
    ======================================== */
-
-/* Responsive modal untuk landscape mode */
-@media (max-width: 991px) {
-    .modal-xl {
-        max-width: 95vw !important;
-        margin: 0.5rem auto;
-    }
-
-    .modal-dialog-scrollable .modal-body {
-        max-height: 70vh;
-    }
+/* Swipeable Nav Tabs */
+#adminModal .nav-tabs {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
 }
 
-/* ADMIN MODAL FIX: Tablet Portrait (agar tidak kepotong) */
-@media (max-width: 1024px) and (orientation: portrait) {
-    .modal-dialog-scrollable .modal-content {
-        max-height: 90vh !important;
-        overflow: hidden;
-    }
-
-    .modal-dialog-scrollable .modal-body {
-        max-height: calc(90vh - 120px) !important;
-        /* Header + Footer height approx 120px */
-    }
+#adminModal .nav-tabs::-webkit-scrollbar {
+    height: 4px;
 }
 
-/* Tablet/Phone Landscape: Pastikan modal tidak terpotong */
-@media (orientation: landscape) and (max-height: 768px) {
+#adminModal .nav-tabs::-webkit-scrollbar-thumb {
+    background: #ced4da;
+    border-radius: 4px;
+}
+
+#adminModal .nav-item {
+    flex: 0 0 auto;
+}
+
+/* 2. Admin Modal Landscape / Tablet Fixes */
+@media (max-width: 1024px) {
     .modal-xl {
         max-width: 98vw !important;
         margin: 0.25rem auto;
     }
 
+    /* Tabel di dalam modal admin agar bisa scroll */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Tablet/Phone Landscape: Pastikan modal tidak terpotong */
+@media (orientation: landscape) and (max-height: 768px) {
     .modal-dialog-scrollable {
-        max-height: 95vh;
+        max-height: 96vh;
     }
 
     .modal-dialog-scrollable .modal-body {
-        max-height: calc(95vh - 120px);
-        overflow-y: auto;
+        max-height: calc(96vh - 100px);
     }
 
-    /* Pastikan tabs tidak terpotong dan bisa scroll horizontal */
-    .nav-tabs {
-        flex-wrap: nowrap !important;
+    /* Tombol footer bisa scroll jika terlalu banyak */
+    .modal-footer {
+        flex-wrap: nowrap;
         overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        white-space: nowrap;
-    }
-
-    .nav-tabs .nav-item {
-        flex: 0 0 auto;
-    }
-
-    .nav-tabs .nav-link {
-        white-space: nowrap;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.9rem;
+        justify-content: flex-end;
     }
 }
 
