@@ -801,9 +801,20 @@ function renderTransactionHistory() {
             </td>
             <td style="text-align: center; vertical-align: middle;">
                 <div class="fw-bold">Rp ${formatNumber(Number(t?.total) || 0)}</div>
+                <small class="text-muted d-block" style="font-size: 0.75rem;">${t.payment?.method ? t.payment.method.toUpperCase() : 'CASH'}</small>
             </td>
             <td style="text-align: center; vertical-align: middle;">
-                <button type="button" class="btn btn-sm btn-outline-primary" data-action="reprint" data-tx="${txNo}">Cetak</button>
+                <div class="d-flex justify-content-center gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-dark" data-action="reprint" data-tx="${txNo}" title="Cetak Thermal">
+                        <i class="bi bi-printer"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-action="print-pdf" data-tx="${txNo}" title="Cetak PDF">
+                        <i class="bi bi-file-pdf"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-success" data-action="share-wa" data-tx="${txNo}" title="Kirim WA">
+                        <i class="bi bi-whatsapp"></i>
+                    </button>
+                </div>
             </td>
             <td style="text-align: center; vertical-align: middle;">
                 <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-tx="${txNo}" aria-label="Hapus">
@@ -1451,10 +1462,62 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const deleteAllBtn = document.getElementById('delete-all-transactions-btn');
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', deleteAllTransactions);
+    }
+
+    // Analytics Refresh
+    const refreshAnalyticsBtn = document.getElementById('refresh-analytics-btn');
+    if (refreshAnalyticsBtn) {
+        refreshAnalyticsBtn.addEventListener('click', () => {
+            renderBusinessAnalytics();
+            showAlert('Data analisis diperbarui', 'success');
+        });
+    }
+
+    // Payment Method Listener
+    const paymentMethodEl = document.getElementById('payment-method');
+    const cashFields = document.getElementById('cash-payment-fields');
+    if (paymentMethodEl && cashFields) {
+        paymentMethodEl.addEventListener('change', () => {
+            const method = paymentMethodEl.value;
+            if (method === 'cash') {
+                cashFields.style.display = 'block';
+                amountPaidEl.value = '';
+                changeAmountEl.value = '';
+                amountPaidEl.focus();
+            } else {
+                cashFields.style.display = 'none';
+                // Auto fill for non-cash
+                if (currentTransaction && currentTransaction.total) {
+                    amountPaidEl.value = currentTransaction.total;
+                }
+            }
+            calculateChange();
+        });
+    }
+
     // Analytics tab event listeners
     if (analyticsTabBtn) {
         analyticsTabBtn.addEventListener('shown.bs.tab', () => {
             renderBusinessAnalytics();
+        });
+    }
+
+    if (adminHistoryTbody) {
+        adminHistoryTbody.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const txNo = btn.dataset.tx;
+            const action = btn.dataset.action;
+
+            const trx = getTransactionHistory().find(t => t.transactionNo === txNo);
+
+            if (action === 'reprint') reprintTransaction(txNo);
+            if (action === 'print-pdf') showReceipt(trx);
+            if (action === 'share-wa') shareViaWhatsApp(trx);
+            if (action === 'delete') deleteTransaction(txNo);
         });
     }
 
@@ -2445,17 +2508,29 @@ function showPaymentModal() {
 }
 
 // Calculate change
+// Calculate change
 function calculateChange() {
+    const paymentMethodEl = document.getElementById('payment-method');
+    const method = paymentMethodEl ? paymentMethodEl.value : 'cash';
     const amountPaid = parseFloat(amountPaidEl.value) || 0;
     const total = currentTransaction.total;
+    const completeBtn = document.getElementById('complete-payment');
 
-    if (amountPaid >= total) {
-        const change = amountPaid - total;
-        changeAmountEl.value = `Rp ${formatNumber(change)}`;
-        document.getElementById('complete-payment').disabled = false;
+    if (method === 'cash') {
+        if (amountPaid >= total) {
+            const change = amountPaid - total;
+            changeAmountEl.value = `Rp ${formatNumber(change)}`;
+            completeBtn.disabled = false;
+        } else {
+            changeAmountEl.value = '0';
+            completeBtn.disabled = true; // Wait full payment
+        }
     } else {
-        changeAmountEl.value = '0';
-        document.getElementById('complete-payment').disabled = true;
+        // QRIS / Transfer: Assume paid exactly
+        changeAmountEl.value = 'Rp 0';
+        // Auto-set amount paid if empty
+        if (!amountPaidEl.value) amountPaidEl.value = total;
+        completeBtn.disabled = false;
     }
 }
 
@@ -2471,6 +2546,7 @@ function completePayment() {
     const paidAtDate = new Date();
     const transactionNo = generateTransactionNo(paidAtDate);
     const settings = getSettings();
+    const paymentMethod = document.getElementById('payment-method')?.value || 'cash';
 
     const transactionData = {
         ...currentTransaction,
@@ -2483,7 +2559,7 @@ function completePayment() {
         payment: {
             amountPaid: amountPaid,
             change: amountPaid - currentTransaction.total,
-            method: 'cash' // In a real app, you would have a payment method selector
+            method: paymentMethod
         },
         date: paidAtDate.toISOString(),
         paidAtDate,
@@ -3039,12 +3115,20 @@ async function cetakStruk(transaksi) {
             const price = Number(it.price) || 0;
             const namaBarang = `${it.name} x${qty}`;
             const harga = `Rp ${formatNumber(price * qty)}`;
-            const maxNamaLen = 32 - harga.length - 1;
-            const namaTerpotong = namaBarang.length > maxNamaLen
-                ? namaBarang.substring(0, maxNamaLen)
-                : namaBarang;
-            const line = formatStrukLine(namaTerpotong, harga, 32) + '\n';
-            itemsBytes.push(...encoder.encode(line));
+
+            // v3.0: Split item names if too long
+            if ((namaBarang.length + harga.length + 1) <= 32) {
+                const line = formatStrukLine(namaBarang, harga, 32) + '\n';
+                itemsBytes.push(...encoder.encode(line));
+            } else {
+                // Line 1: Item Name (truncated to 32 chars)
+                const line1 = namaBarang.substring(0, 32) + '\n';
+                itemsBytes.push(...encoder.encode(line1));
+
+                // Line 2: Price right aligned
+                const line2 = formatStrukLine('', harga, 32) + '\n';
+                itemsBytes.push(...encoder.encode(line2));
+            }
         });
 
         // === TOTALS (Left-aligned, 32 char padded) ===
@@ -3682,4 +3766,345 @@ window.saveBrandChange = function () {
     alert(`Merek berhasil diubah!\n${affectedProducts.length} produk terupdate.`);
     window.location.reload();
 };
+
+
+// ========================================
+// v3.0 FEATURE ADDITIONS
+// ========================================
+
+/**
+ * Kirim Struk via WhatsApp
+ * Membuka WA dengan pesan terformat berisi detail transaksi
+ */
+function shareViaWhatsApp(transaction) {
+    if (!transaction) return;
+
+    // 1. Minta nomor WA pelanggan (opsional, bisa kosong jika user ingin input manual di WA)
+    let phoneNumber = prompt("Masukkan nomor WhatsApp pelanggan (contoh: 0812...):", "");
+    if (phoneNumber === null) return; // Cancelled
+
+    // Format nomor: Ganti 08... dengan 628...
+    phoneNumber = phoneNumber.trim();
+    if (phoneNumber.startsWith("08")) {
+        phoneNumber = "628" + phoneNumber.substring(2);
+    } else if (phoneNumber.startsWith("8")) {
+        phoneNumber = "62" + phoneNumber;
+    }
+    // Jika user tidak input, biarkan kosong (akan buka WA tanpa nomor spesifik, user pilih kontak sendiri)
+
+    // 2. Buat Teks Struk
+    const paidAtDate = transaction.paidAtDate ? new Date(transaction.paidAtDate) : new Date(transaction.date);
+    const dateStr = formatDateTimeParts(paidAtDate).dateTime;
+    const items = transaction.items || [];
+
+    let text = `*DEWA BAN - STRUK TRANSAKSI*\n`;
+    text += `No: ${transaction.transactionNo}\n`;
+    text += `Tgl: ${dateStr}\n`;
+    text += `Kasir: ${transaction.cashier || '-'}\n`;
+    text += `--------------------------------\n`;
+
+    items.forEach(it => {
+        text += `${it.name} x${it.quantity} = Rp ${formatNumber((it.price || 0) * (it.quantity || 0))}\n`;
+    });
+
+    text += `--------------------------------\n`;
+    text += `Subtotal: Rp ${formatNumber(transaction.subtotal || 0)}\n`;
+    if (transaction.discount > 0) text += `Diskon: -Rp ${formatNumber(transaction.discount)}\n`;
+    if (transaction.tax > 0) text += `Pajak: Rp ${formatNumber((transaction.total - (transaction.subtotal - transaction.discount)))}\n`;
+    text += `*TOTAL: Rp ${formatNumber(transaction.total || 0)}*\n`;
+    text += `Metode: ${transaction.payment?.method ? transaction.payment.method.toUpperCase() : 'CASH'}\n`;
+    text += `\n_Terima kasih telah berbelanja di DEWA BAN._`;
+
+    // 3. Encode URI
+    const encodedText = encodeURIComponent(text);
+
+    // 4. Buka WA Link
+    let url = "";
+    if (phoneNumber) {
+        url = `https://wa.me/${phoneNumber}?text=${encodedText}`;
+    } else {
+        url = `https://wa.me/?text=${encodedText}`;
+    }
+
+    window.open(url, '_blank');
+}
+
+/**
+ * Hapus Semua Transaksi (Danger Zone)
+ * 2x Konfirmasi untuk keamanan
+ */
+function deleteAllTransactions() {
+    const history = getTransactionHistory();
+    if (history.length === 0) {
+        showAlert('Riwayat transaksi sudah kosong.', 'info');
+        return;
+    }
+
+    if (!confirm(`⚠️ PERINGATAN KERAS ⚠️\n\nAnda akan MENGHAPUS SEMUA riwayat transaksi (${history.length} data).\nData yang dihapus TIDAK BISA dipulihkan.\n\nApakah anda yakin?`)) {
+        return;
+    }
+
+    if (!confirm(`🛡️ KONFIRMASI TERAKHIR 🛡️\n\nKetik "OK" jika anda benar-benar ingin menghapus seluruh data penjualan dari database.`)) {
+        return;
+    }
+
+    // Eksekusi Hapus LocalStorage
+    localStorage.removeItem('transactions');
+
+    // Eksekusi Hapus Firebase (Jika connected)
+    if (typeof db !== 'undefined' && typeof firebase !== 'undefined') {
+        db.ref('transactions').remove()
+            .then(() => {
+                console.log('🔥 Semua transaksi dihapus dari Firebase.');
+            })
+            .catch(err => {
+                console.error('Gagal hapus Firebase:', err);
+            });
+    }
+
+    renderTransactionHistory();
+    renderBusinessAnalytics(); // Update chart jadi kosong
+    renderAdminDailyStats();   // Update stats jadi 0
+    showAlert('Semua riwayat transaksi telah dihapus.', 'success');
+}
+
+// ========================================
+// ANALISIS BISNIS (Chart.js)
+// ========================================
+
+const charts = {
+    revenue: null,
+    topProducts: null,
+    brandSales: null
+};
+
+window.renderBusinessAnalytics = function () {
+    console.log('📊 Rendering Analytics...');
+    // Dapatkan data terbaru
+    const transactions = getTransactionHistory(); // Gunakan fungsi helper yang ada
+
+    renderRevenueChart(transactions);
+    renderTopProductsChart(transactions);
+    renderBrandSalesChart(transactions);
+
+    // Update critical stock table juga
+    const criticalTable = document.getElementById('critical-stock-tbody');
+    if (criticalTable) {
+        // Logic critical stock (≤ 5)
+        const criticalItems = products.filter(p => (Number(p.stock) || 0) <= 5);
+        criticalTable.innerHTML = '';
+
+        const emptyMsg = document.getElementById('critical-stock-empty');
+        if (criticalItems.length === 0) {
+            if (emptyMsg) emptyMsg.classList.remove('d-none');
+        } else {
+            if (emptyMsg) emptyMsg.classList.add('d-none');
+            criticalItems.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="fw-bold">${p.name}</div>
+                        <small class="text-muted">${p.brand || '-'}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge ${p.stock <= 0 ? 'bg-danger' : 'bg-warning text-dark'}">
+                            ${p.stock} pcs
+                        </span>
+                    </td>
+                    <td class="text-end">
+                       <button class="btn btn-sm btn-link p-0" onclick="openEditModal('${p.id}')">
+                           <i class="bi bi-pencil-square"></i>
+                       </button>
+                    </td>
+                `;
+                criticalTable.appendChild(tr);
+            });
+        }
+    }
+
+    // Update KPI Cards
+    const today = new Date();
+    const todayTrans = transactions.filter(t => isSameLocalDate(new Date(t.date), today));
+
+    const omzet = todayTrans.reduce((sum, t) => sum + (Number(t.total) || 0), 0);
+    const profit = todayTrans.reduce((sum, t) => {
+        const itemProfit = (t.items || []).reduce((isum, it) => {
+            const cost = Number(it.costPrice) || (Number(it.price) * 0.8);
+            return isum + ((Number(it.price) - cost) * Number(it.quantity));
+        }, 0);
+        return sum + itemProfit;
+    }, 0);
+
+    const itemsSold = todayTrans.reduce((sum, t) => {
+        return sum + (t.items || []).reduce((isum, it) => isum + (Number(it.quantity) || 0), 0);
+    }, 0);
+
+    document.getElementById('admin-daily-omzet').textContent = `Rp ${formatNumber(omzet)}`;
+    document.getElementById('admin-daily-transactions').textContent = todayTrans.length;
+    document.getElementById('admin-daily-items').textContent = `${itemsSold} pcs`;
+    document.getElementById('admin-daily-profit').textContent = `Rp ${formatNumber(profit)}`;
+};
+
+function renderRevenueChart(transactions) {
+    const ctx = document.getElementById('revenueChart');
+    if (!ctx) return;
+
+    // Prepare Data: Last 7 Days
+    const labels = [];
+    const data = [];
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }); // "18 Feb"
+        labels.push(dateStr);
+
+        // Sum revenue for this day
+        const dayRevenue = transactions
+            .filter(t => isSameLocalDate(new Date(t.date), d))
+            .reduce((sum, t) => {
+                const profit = (t.items || []).reduce((psum, it) => {
+                    const cost = Number(it.costPrice) || Math.round(Number(it.price) * 0.8);
+                    return psum + ((Number(it.price) - cost) * Number(it.quantity));
+                }, 0);
+                return sum + profit;
+            }, 0);
+
+        data.push(dayRevenue);
+    }
+
+    if (charts.revenue) charts.revenue.destroy();
+
+    charts.revenue = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Laba',
+                data: data,
+                borderColor: '#dc3545', // Danger Red
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { callback: (val) => 'Rp ' + formatNumber(val) } }
+            }
+        }
+    });
+}
+
+function renderTopProductsChart(transactions) {
+    const ctx = document.getElementById('topProductsChart');
+    if (!ctx) return;
+
+    // Aggregate Product Sales from ALL history? Or just this month? Let's do ALL for now or last 30 days.
+    // User asked for "Top 5 Products Sold". Usually historical.
+    const productSales = {};
+    transactions.forEach(t => {
+        (t.items || []).forEach(it => {
+            const name = it.name;
+            const qty = Number(it.quantity) || 0;
+            productSales[name] = (productSales[name] || 0) + qty;
+        });
+    });
+
+    // Sort Top 5
+    const sortedProducts = Object.entries(productSales)
+        .sort((a, b) => b[1] - a[1]) // Descending
+        .slice(0, 5);
+
+    const labels = sortedProducts.map(p => p[0]); // Names
+    const data = sortedProducts.map(p => p[1]);   // Qtys
+
+    if (charts.topProducts) charts.topProducts.destroy();
+
+    charts.topProducts = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Terjual (Pcs)',
+                data: data,
+                backgroundColor: [
+                    '#ffc107', '#fd7e14', '#dc3545', '#198754', '#0d6efd'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y', // Horizontal Bar
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+function renderBrandSalesChart(transactions) {
+    const ctx = document.getElementById('brandSalesChart');
+    if (!ctx) return;
+
+    // Aggregate Brand Sales
+    const brandSales = {};
+    transactions.forEach(t => {
+        (t.items || []).forEach(it => {
+            let brand = it.brand;
+
+            if (!brand) {
+                // Cari di master product
+                const masterP = products.find(p => p.id === it.id || p.name === it.name);
+                if (masterP && masterP.brand) brand = masterP.brand;
+                else brand = 'Lainnya';
+            }
+
+            const qty = Number(it.quantity) || 0;
+            brandSales[brand] = (brandSales[brand] || 0) + qty;
+        });
+    });
+
+    const labels = Object.entries(brandSales).map(([k, v]) => `${k} (${v} pcs)`);
+    const data = Object.values(brandSales);
+
+    if (charts.brandSales) charts.brandSales.destroy();
+
+    charts.brandSales = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: [
+                    '#FF0000', // Red
+                    '#00FF00', // Green
+                    '#0000FF', // Blue
+                    '#FFFF00', // Yellow
+                    '#FFA500', // Orange
+                    '#800080', // Purple
+                    '#00FFFF', // Cyan
+                    '#FF00FF', // Magenta
+                    '#008000', // Dark Green
+                    '#000080', // Navy
+                    '#808000', // Olive
+                    '#800000', // Maroon
+                    '#008080', // Teal
+                    '#808080', // Grey
+                    '#C0C0C0'  // Silver
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 10 } }
+            }
+        }
+    });
+}
 
